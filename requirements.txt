@@ -1,0 +1,19 @@
+fastapi
+pydantic
+pydantic-settings>=2.6.0
+python-dotenv
+
+google-adk
+
+sqlalchemy > 2.0
+pypdf
+
+haystack-ai
+qdrant-client
+
+boto3
+httpx
+motor
+
+litellm
+redis
