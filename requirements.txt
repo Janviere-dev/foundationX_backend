@@ -1,19 +1,30 @@
+# fastapi
 fastapi
 pydantic
 pydantic-settings>=2.6.0
 python-dotenv
 
-google-adk
-
+# database
 sqlalchemy > 2.0
-pypdf
-
-haystack-ai
-qdrant-client
-
-boto3
-httpx
 motor
 
+# converter
+pypdf
+ebooklib
+beautifulsoup4
+
+
+# cloudflare
+boto3
+
+# http request
+httpx
+
+# rag & llm
 litellm
 redis
+google-genai-haystack
+qdrant-haystack
+google-adk
+haystack-ai
+qdrant-client
