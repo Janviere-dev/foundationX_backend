@@ -1,5 +1,7 @@
-.env
+.claude/
+*.env
 __pycache__/
 venv/
 .venv/
 .env/
+ressources/
