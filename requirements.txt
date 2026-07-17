@@ -28,3 +28,4 @@ qdrant-haystack
 google-adk
 haystack-ai
 qdrant-client
+nltk>=3.9.1

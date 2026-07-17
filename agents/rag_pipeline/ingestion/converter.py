@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
+import json
 import time
 import os
-import asyncio
 import ebooklib
 
 from pathlib import Path
@@ -20,9 +20,14 @@ from collections import Counter
 from dataclasses import replace
 
 from .cleaner import DocumentCleaner
+from .helpers.helper_get_subject_name import infer_subject
+from .helpers.helper_get_grade_name import infer_grade
 
 load_dotenv()
+
 document_path = Path(__file__).parent.parent.parent/"ressources"/"books_to_chunk"/"programming"
+
+
 
 class Converter:
     def __init__(self):
@@ -51,6 +56,8 @@ class Converter:
                 meta={
                     "date_added": datetime.now(timezone.utc).isoformat(),
                     "file_name": file_path.name,
+                    "subject": infer_subject(file_path),
+                    "grade": infer_grade(file_path),
                 },
             )
         ]
@@ -61,7 +68,9 @@ class Converter:
         """
         meta={
             "date_added":datetime.now(timezone.utc).isoformat(),
-            "file_name":file_path.name
+            "file_name":file_path.name,
+            "subject":infer_subject(file_path),
+            "grade":infer_grade(file_path)
             }
 
         if file_path.suffix.lower() == ".pdf":
@@ -107,6 +116,10 @@ class Converter:
                 print(f"document {i} over {len(futures_conversion)} converted")
         end_time = time.perf_counter()
         elaps = end_time - start_time
+
+        with open("document_split.json", "w", encoding="utf-8") as file:
+            json.dump([doc.to_dict() for doc in self.__documents], file, indent=2)
+
         print(f"process complete after {elaps:.2f} seconds")
         return self.__documents
 
