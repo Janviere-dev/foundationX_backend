@@ -22,6 +22,7 @@ from dataclasses import replace
 from .cleaner import DocumentCleaner
 from .helpers.helper_get_subject_name import infer_subject
 from .helpers.helper_get_grade_name import infer_grade
+from .helpers.helper_ocr import repair_pdf_text
 
 load_dotenv()
 
@@ -78,6 +79,10 @@ class Converter:
                 sources=[file_path],
                 meta=meta
             )["documents"]
+            documents = [
+                replace(doc, content=repair_pdf_text(file_path, doc.content))
+                for doc in documents
+            ]
         elif file_path.suffix.lower() == ".docx":
             documents = self.__docx_converter.run(
                 sources=[file_path],
