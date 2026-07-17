@@ -20,25 +20,26 @@ def page_needs_ocr(page_text: str) -> bool:
     return bool(CORRUPTION_PATTERN.search(page_text))
 
 
-def repair_pdf_text(pdf_path: Path, extracted_text: str, dpi: int = 300) -> str:
-    """Replace any broken page in extracted_text with OCR'd text from the
-    original PDF. Pages are '\\f'-separated, matching PyPDFToDocument's
-    per-page joining. Only opens/rasterizes pages that actually need it."""
-    pages = extracted_text.split("\x0c")
+def repair_pdf_text(pdf_path: Path, dpi: int = 300) -> str:
+    """Rebuild a PDF's text page-by-page directly from the PDF itself, OCR-ing
+    any page that's empty or has broken/garbled text.
 
+    Deliberately ignores the original pypdf-extracted text and its '\\f' page
+    boundaries entirely: a broken font encoding can spuriously decode some of
+    its glyphs to '\\f' too, which massively inflates the apparent page count
+    (e.g. one book had 5445 '\\f'-delimited "pages" for a real 540-page PDF).
+    Trusting that count to index into the real PDF sends most OCR calls to
+    out-of-range pages, which silently come back empty. Using the PDF's own
+    page objects as the source of truth for both the page count and each
+    page's text sidesteps this entirely."""
+    pages = []
     with fitz.open(pdf_path) as pdf:
-        # a totally empty/near-empty extraction (e.g. a scanned PDF with no text
-        # layer at all) yields far fewer "pages" here than the PDF actually has -
-        # pad out to the real page count so every page gets OCR'd, not just the first
-        if len(pages) < len(pdf):
-            pages += [""] * (len(pdf) - len(pages))
-
-        bad_page_indexes = [i for i, page_text in enumerate(pages) if page_needs_ocr(page_text)]
-        for i in bad_page_indexes:
-            if i >= len(pdf):
-                continue
-            pixmap = pdf[i].get_pixmap(dpi=dpi)
-            image = Image.open(io.BytesIO(pixmap.tobytes("png")))
-            pages[i] = pytesseract.image_to_string(image)
+        for page in pdf:
+            page_text = page.get_text()
+            if page_needs_ocr(page_text):
+                pixmap = page.get_pixmap(dpi=dpi)
+                image = Image.open(io.BytesIO(pixmap.tobytes("png")))
+                page_text = pytesseract.image_to_string(image)
+            pages.append(page_text)
 
     return "\x0c".join(pages)

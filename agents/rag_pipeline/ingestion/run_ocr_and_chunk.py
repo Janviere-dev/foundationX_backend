@@ -12,6 +12,9 @@ Run with: ./venv/bin/python3 -m agents.rag_pipeline.ingestion.run_ocr_and_chunk
 Env vars:
   OCR_WORKERS - parallel OCR workers (default: os.cpu_count())
   OCR_LIMIT   - only process the first N cached documents (for smoke-testing)
+  OCR_FILES   - comma-separated file_names to re-OCR; all other documents are
+                loaded and re-chunked as-is but skipped for OCR (fast targeted
+                re-run instead of reprocessing the whole corpus)
 """
 import io
 import json
@@ -59,11 +62,18 @@ def ocr_one_page(pdf_path: Path, page_index: int, dpi: int = 300) -> str:
         return pytesseract.image_to_string(image)
 
 
-def build_ocr_jobs(cached_documents):
-    """For each document, pad its pages to the real PDF page count (a totally
-    empty extraction, e.g. a scanned past paper, would otherwise look like a
-    single blank page instead of the real page count) and collect every page
-    needing OCR into one flat job list for corpus-wide parallel execution."""
+def build_ocr_jobs(cached_documents, target_names=None):
+    """For each document, extract fresh per-page text directly from the real
+    PDF via PyMuPDF and collect every page needing OCR into one flat job list
+    for corpus-wide parallel execution.
+
+    Deliberately ignores the cached document's own '\\f'-delimited content
+    entirely: a broken font encoding can spuriously decode some of its glyphs
+    to '\\f' too, badly inflating the apparent page count (one book had 5445
+    '\\f'-delimited "pages" for a real 540-page PDF). Trusting that count to
+    index into the real PDF sends most OCR calls to out-of-range pages, which
+    silently come back empty. Using the PDF's own pages as the source of
+    truth for both the page count and each page's text sidesteps this."""
     jobs = []
     doc_pages = {}
 
@@ -73,17 +83,17 @@ def build_ocr_jobs(cached_documents):
             logger.warning("Document at index %d has no file_name, skipping", doc_index)
             continue
 
+        if target_names is not None and file_name not in target_names:
+            continue
+
         try:
             pdf_path = find_pdf_path(file_name)
             if pdf_path is None:
                 logger.warning("Could not find source PDF on disk for %s, skipping OCR", file_name)
                 continue
 
-            pages = (doc.get("content") or "").split("\x0c")
             with fitz.open(pdf_path) as pdf:
-                real_page_count = len(pdf)
-            if len(pages) < real_page_count:
-                pages += [""] * (real_page_count - len(pages))
+                pages = [page.get_text() for page in pdf]
 
             doc_pages[doc_index] = pages
             bad_indexes = [i for i, p in enumerate(pages) if page_needs_ocr(p)]
@@ -96,8 +106,8 @@ def build_ocr_jobs(cached_documents):
     return jobs, doc_pages
 
 
-def run_ocr(cached_documents):
-    jobs, doc_pages = build_ocr_jobs(cached_documents)
+def run_ocr(cached_documents, target_names=None):
+    jobs, doc_pages = build_ocr_jobs(cached_documents, target_names)
     logger.info("Total pages needing OCR: %d", len(jobs))
 
     start = time.perf_counter()
@@ -163,7 +173,13 @@ def main():
         cached_documents = cached_documents[:int(limit)]
         logger.info("OCR_LIMIT set: only processing first %d documents", int(limit))
 
-    cached_documents = run_ocr(cached_documents)
+    target_names = None
+    files_env = os.getenv("OCR_FILES")
+    if files_env:
+        target_names = {name.strip() for name in files_env.split(",") if name.strip()}
+        logger.info("OCR_FILES set: only re-OCR'ing %d target file(s): %s", len(target_names), sorted(target_names))
+
+    cached_documents = run_ocr(cached_documents, target_names)
 
     with open(CACHE_PATH, "w", encoding="utf-8") as f:
         json.dump(cached_documents, f, indent=2)

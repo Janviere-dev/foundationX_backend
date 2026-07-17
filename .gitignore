@@ -8,3 +8,6 @@ ressources/
 try.py
 document_split.json
 push_github.sh
+event.log
+chunks.json
+document_split.json

@@ -14,7 +14,7 @@ from ebooklib import epub
 from bs4 import BeautifulSoup
 
 from haystack import Document
-from haystack.components.converters import PyPDFToDocument, DOCXToDocument
+from haystack.components.converters import DOCXToDocument
 
 from collections import Counter
 from dataclasses import replace
@@ -32,7 +32,6 @@ document_path = Path(__file__).parent.parent.parent/"ressources"/"books_to_chunk
 
 class Converter:
     def __init__(self):
-        self.__pdf_converter = PyPDFToDocument()
         self.__docx_converter = DOCXToDocument()
         self.__cleaner = DocumentCleaner()
         self.__documents = []
@@ -75,14 +74,7 @@ class Converter:
             }
 
         if file_path.suffix.lower() == ".pdf":
-            documents = self.__pdf_converter.run(
-                sources=[file_path],
-                meta=meta
-            )["documents"]
-            documents = [
-                replace(doc, content=repair_pdf_text(file_path, doc.content))
-                for doc in documents
-            ]
+            documents = [Document(content=repair_pdf_text(file_path), meta=meta)]
         elif file_path.suffix.lower() == ".docx":
             documents = self.__docx_converter.run(
                 sources=[file_path],
