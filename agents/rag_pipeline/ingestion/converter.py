@@ -14,7 +14,7 @@ from ebooklib import epub
 from bs4 import BeautifulSoup
 
 from haystack import Document
-from haystack.components.converters import PyPDFToDocument, DOCXToDocument
+from haystack.components.converters import DOCXToDocument
 
 from collections import Counter
 from dataclasses import replace
@@ -22,6 +22,7 @@ from dataclasses import replace
 from .cleaner import DocumentCleaner
 from .helpers.helper_get_subject_name import infer_subject
 from .helpers.helper_get_grade_name import infer_grade
+from .helpers.helper_ocr import repair_pdf_text
 
 load_dotenv()
 
@@ -31,10 +32,22 @@ document_path = Path(__file__).parent.parent.parent/"ressources"/"books_to_chunk
 
 class Converter:
     def __init__(self):
-        self.__pdf_converter = PyPDFToDocument()
         self.__docx_converter = DOCXToDocument()
         self.__cleaner = DocumentCleaner()
         self.__documents = []
+        self.__existing_file_names = set()
+
+    def load_existing_cache(self, cache_path="document_split.json"):
+        """Load any already-converted documents so re-runs only process new files."""
+        if not os.path.exists(cache_path):
+            return []
+        with open(cache_path, encoding="utf-8") as f:
+            existing_documents = json.load(f)
+        self.__existing_file_names = {
+            doc["file_name"] for doc in existing_documents if doc.get("file_name")
+        }
+        return existing_documents
+
     def check_file_type(self, items:Path):
         return Counter(
             f.suffix.lower() for f in items.rglob("*") if f.is_file()
@@ -74,10 +87,7 @@ class Converter:
             }
 
         if file_path.suffix.lower() == ".pdf":
-            documents = self.__pdf_converter.run(
-                sources=[file_path],
-                meta=meta
-            )["documents"]
+            documents = [Document(content=repair_pdf_text(file_path), meta=meta)]
         elif file_path.suffix.lower() == ".docx":
             documents = self.__docx_converter.run(
                 sources=[file_path],
@@ -105,8 +115,17 @@ class Converter:
         """run operation in parallel with threadexecutor"""
         start_time = time.perf_counter()
         print("Process started")
-        files = [file for file in items.rglob("*") if file.suffix.lower() in (".pdf",".docx", ".epub")]
-        
+
+        existing_documents = self.load_existing_cache()
+        print(f"Loaded {len(existing_documents)} already-converted document(s) from cache")
+
+        files = [
+            file for file in items.rglob("*")
+            if file.suffix.lower() in (".pdf", ".docx", ".epub")
+            and file.name not in self.__existing_file_names
+        ]
+        print(f"Found {len(files)} new file(s) to convert (skipping already-converted ones)")
+
         with ThreadPoolExecutor(max_workers=nbr_worker) as executor:
             futures_conversion = [executor.submit(self.convert_files, file) for file in files]
 
@@ -117,8 +136,9 @@ class Converter:
         end_time = time.perf_counter()
         elaps = end_time - start_time
 
+        all_documents = existing_documents + [doc.to_dict() for doc in self.__documents]
         with open("document_split.json", "w", encoding="utf-8") as file:
-            json.dump([doc.to_dict() for doc in self.__documents], file, indent=2)
+            json.dump(all_documents, file, indent=2)
 
         print(f"process complete after {elaps:.2f} seconds")
         return self.__documents

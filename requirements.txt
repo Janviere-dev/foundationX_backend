@@ -12,6 +12,9 @@ motor
 pypdf
 ebooklib
 beautifulsoup4
+pymupdf
+pytesseract
+pillow
 
 
 # cloudflare
