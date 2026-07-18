@@ -4,9 +4,10 @@ pydantic
 pydantic-settings>=2.6.0
 python-dotenv
 
-# database
+# storage
 sqlalchemy > 2.0
 motor
+redis-client
 
 # converter
 pypdf
@@ -25,10 +26,13 @@ httpx
 
 # rag & llm
 litellm
-redis
 google-genai-haystack
 qdrant-haystack
 google-adk
 haystack-ai
 qdrant-client
 nltk>=3.9.1
+sentence-transformers
+
+# background task
+celery
