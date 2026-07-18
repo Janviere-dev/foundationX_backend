@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 Full production run: OCR-repair every cached document (all 150, including
-scanned past papers), save repaired full documents back to document_split.json,
-then chunk everything and save chunks to chunks.json.
+scanned past papers), save repaired full documents back to caches/document_split.json,
+then chunk everything and save chunks to caches/chunks.json.
 
-Progress and errors are logged to event.log (and stdout) so the run can be
-monitored while unattended on a server.
+Progress and errors are logged to server_logs/event.log (and stdout) so the run can be
+monitored while unattended on a server. Both caches/ and server_logs/ are created
+automatically if they don't exist yet.
 
 Run with: ./venv/bin/python3 -m agents.rag_pipeline.ingestion.run_ocr_and_chunk
 
@@ -33,10 +34,16 @@ from .helpers.helper_ocr import page_needs_ocr
 from .chunking import DocumentSplitter
 
 RESSOURCES_ROOT = Path(__file__).parent.parent.parent / "ressources"
-CACHE_PATH = Path(__file__).parent.parent.parent.parent / "document_split.json"
-CHUNKS_PATH = Path(__file__).parent.parent.parent.parent / "chunks.json"
-LOG_PATH = Path(__file__).parent.parent.parent.parent / "event.log"
+REPO_ROOT = Path(__file__).parent.parent.parent.parent
+CACHES_DIR = REPO_ROOT / "caches"
+LOGS_DIR = REPO_ROOT / "server_logs"
+CACHE_PATH = CACHES_DIR / "document_split.json"
+CHUNKS_PATH = CACHES_DIR / "chunks.json"
+LOG_PATH = LOGS_DIR / "event.log"
 MAX_WORKERS = int(os.getenv("OCR_WORKERS", os.cpu_count()))
+
+CACHES_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
