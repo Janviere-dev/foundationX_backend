@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import hashlib
 import json
 import logging
 from pathlib import Path
@@ -10,6 +9,7 @@ from typing import List
 
 from haystack import Document
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
+from haystack.utils import ComponentDevice
 
 from agents.rag_pipeline.ingestion.helpers_embedding.handle_duplicate import deduplicate_chunks
 from agents.rag_pipeline.ingestion.helpers_embedding.fix_chunks_naming import fix_naming
@@ -80,6 +80,7 @@ def embedding():
     logger.info("=== Starting embedding run ===")
     embedder = SentenceTransformersDocumentEmbedder(
         model=EMBEDDING_MODEL,
+        device=ComponentDevice.from_str("cpu"),
         batch_size=64
         )
 
