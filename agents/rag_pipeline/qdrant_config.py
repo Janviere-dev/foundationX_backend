@@ -13,7 +13,8 @@ def init_qdrant() -> QdrantDocumentStore:
         url=os.getenv("QDRANT_URL"),
         index=os.getenv("QDRANT_COLLECTION_NAME"),
         embedding_dim=int(os.getenv("DIMENSION")),
-        api_key=Secret.from_env_var("QDRANT_API_KEY")
+        api_key=Secret.from_env_var("QDRANT_API_KEY"),
+        timeout=int(os.getenv("QDRANT_TIMEOUT", "60")),
     )
 
 if __name__ == "__main__":

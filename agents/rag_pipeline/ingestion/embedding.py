@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL = os.getenv("MODEL_EMBEDDER", "BAAI/bge-m3")
 EMBEDDING_DIMENSION = int(os.getenv("DIMENSION", "1024"))
+EMBED_BATCH_SIZE = int(os.getenv("EMBED_BATCH_SIZE", "8"))
+EMBED_DEVICE = os.getenv("EMBED_DEVICE", "cuda:0")
 
 def clean_learning_materials(learning_chunks:Path) -> List[Document]:
     """
@@ -76,19 +78,24 @@ def load_learning_unit(learning_unit:Path) -> List[Document]:
 
     return [Document.from_dict(chunk) for chunk in learning_contents]
 
-def embedding():
-    logger.info("=== Starting embedding run ===")
+def create_embedder() -> SentenceTransformersDocumentEmbedder:
+    """Build and warm up one embedder instance, meant to be reused across
+    many calls to embed_documents() rather than recreated per slice - reloading
+    the multi-GB model repeatedly would be wasteful."""
+    logger.info("Loading embedding model %s on %s (batch_size=%d)...", EMBEDDING_MODEL, EMBED_DEVICE, EMBED_BATCH_SIZE)
     embedder = SentenceTransformersDocumentEmbedder(
         model=EMBEDDING_MODEL,
-        device=ComponentDevice.from_str("cpu"),
-        batch_size=64
+        device=ComponentDevice.from_str(EMBED_DEVICE),
+        batch_size=EMBED_BATCH_SIZE
         )
-
-    logger.info("Loading embedding model %s ...", EMBEDDING_MODEL)
     embedder.warm_up()
     logger.info("Embedding model loaded")
+    return embedder
 
-    # load learning_units
+
+def get_documents_to_embed() -> List[Document]:
+    """Load (building the cache first if needed) the raw, not-yet-embedded
+    documents ready to be sliced and embedded."""
     if not LEARNING_CHUNK_PATH.exists():
         logger.info("%s not found, building it from %s", LEARNING_CHUNK_PATH, CHUNKS_PATH)
         dump_learning_unit(learning_chunk=CHUNKS_PATH)
@@ -102,9 +109,12 @@ def embedding():
         documents = documents[:int(limit)]
         logger.info("EMBED_LIMIT set: only embedding first %d documents", int(limit))
 
-    logger.info("Embedding %d documents with %s", len(documents), EMBEDDING_MODEL)
+    return documents
+
+
+def embed_documents(embedder: SentenceTransformersDocumentEmbedder, documents: List[Document]) -> List[Document]:
+    """Run one already-warmed-up embedder over a (possibly partial) list of documents."""
     embedded_documents = embedder.run(documents=documents)["documents"]
-    logger.info("Embedding complete: %d documents embedded", len(embedded_documents))
 
     if embedded_documents:
         actual_dim = len(embedded_documents[0].embedding)
@@ -115,9 +125,21 @@ def embedding():
                 "before creating/using your Qdrant collection.",
                 EMBEDDING_MODEL, actual_dim, EMBEDDING_DIMENSION,
             )
-        else:
-            logger.info("Embedding dimension confirmed: %d", actual_dim)
 
+    return embedded_documents
+
+
+def embedding():
+    """Convenience wrapper: embed everything in one call. Fine for smoke tests
+    (small EMBED_LIMIT); for the full corpus, use create_embedder() +
+    get_documents_to_embed() + embed_documents() sliced, see store.py."""
+    logger.info("=== Starting embedding run ===")
+    embedder = create_embedder()
+    documents = get_documents_to_embed()
+
+    logger.info("Embedding %d documents with %s", len(documents), EMBEDDING_MODEL)
+    embedded_documents = embed_documents(embedder, documents)
+    logger.info("Embedding complete: %d documents embedded", len(embedded_documents))
     logger.info("=== Embedding run complete ===")
     return embedded_documents
 
