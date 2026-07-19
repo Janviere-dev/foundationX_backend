@@ -9,6 +9,8 @@ from haystack.components.preprocessors import DocumentSplitter as HaystackDocume
 
 from .helpers.helper_remove_cover import MAX_PAGE_CHARS, is_front_matter
 
+CACHE_PATH = Path(__file__).parent.parent.parent.parent / "caches" / "document_split.json"
+
 class DocumentSplitter:
     def __init__(self):
         self.page_splitter = HaystackDocumentSplitter(
@@ -49,9 +51,8 @@ class DocumentSplitter:
         return self.run_splitter(documents=documents)
 
 def load_cached_document(file_name: str) -> Document:
-    """Load a single cached document from document_split.json by file_name, for fast chunking iteration."""
-    cache_path = Path(__file__).parent.parent.parent.parent / "document_split.json"
-    with open(cache_path, encoding="utf-8") as cache_file:
+    """Load a single cached document from caches/document_split.json by file_name, for fast chunking iteration."""
+    with open(CACHE_PATH, encoding="utf-8") as cache_file:
         cached_documents = json.load(cache_file)
     document_dict = next(
         doc for doc in cached_documents
@@ -66,7 +67,7 @@ if __name__ == "__main__":
     sample_document = load_cached_document("Physics S3 SB.pdf")
     #print(sample_document)
     #print("______________________________________________________________________________________")
-    with open(Path(__file__).parent.parent.parent.parent / "document_split.json", encoding='utf-8') as file:
+    with open(CACHE_PATH, encoding='utf-8') as file:
         cached_documents = json.load(file)
     document_list = [Document.from_dict(doc) for doc in cached_documents if doc.get("content")]
 

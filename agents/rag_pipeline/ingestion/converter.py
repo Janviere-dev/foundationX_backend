@@ -27,6 +27,8 @@ from .helpers.helper_ocr import repair_pdf_text
 load_dotenv()
 
 document_path = Path(__file__).parent.parent.parent/"ressources"/"books_to_chunk"/"programming"
+CACHES_DIR = Path(__file__).parent.parent.parent.parent / "caches"
+CACHE_PATH = CACHES_DIR / "document_split.json"
 
 
 
@@ -37,7 +39,7 @@ class Converter:
         self.__documents = []
         self.__existing_file_names = set()
 
-    def load_existing_cache(self, cache_path="document_split.json"):
+    def load_existing_cache(self, cache_path=CACHE_PATH):
         """Load any already-converted documents so re-runs only process new files."""
         if not os.path.exists(cache_path):
             return []
@@ -137,7 +139,8 @@ class Converter:
         elaps = end_time - start_time
 
         all_documents = existing_documents + [doc.to_dict() for doc in self.__documents]
-        with open("document_split.json", "w", encoding="utf-8") as file:
+        CACHES_DIR.mkdir(parents=True, exist_ok=True)
+        with open(CACHE_PATH, "w", encoding="utf-8") as file:
             json.dump(all_documents, file, indent=2)
 
         print(f"process complete after {elaps:.2f} seconds")
