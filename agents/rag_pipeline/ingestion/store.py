@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 from pathlib import Path
 from haystack import Document
 from typing import List
@@ -15,6 +14,9 @@ from agents.rag_pipeline.ingestion.embedding import (
     get_documents_to_embed,
     embed_documents,
 )
+from core.config import get_settings
+
+settings = get_settings()
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 LOGS_DIR = REPO_ROOT / "server_logs"
@@ -23,9 +25,9 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
-SLICE_SIZE = int(os.getenv("STORE_SLICE_SIZE", "500"))
-MAX_RETRIES = int(os.getenv("STORE_MAX_RETRIES", "3"))
-RETRY_DELAY_SECONDS = int(os.getenv("STORE_RETRY_DELAY", "5"))
+SLICE_SIZE = settings.STORE_SLICE_SIZE
+MAX_RETRIES = settings.STORE_MAX_RETRIES
+RETRY_DELAY_SECONDS = settings.STORE_RETRY_DELAY
 
 
 def chunked(items: List, size: int):
@@ -63,16 +65,17 @@ class StoreEmbedding:
                 }) for document in embedded_docs]
 
     def get_existing_ids(self) -> set:
-        """Fetch IDs already stored in Qdrant, so a re-run doesn't waste time
-        re-embedding and re-uploading documents that already succeeded."""
+        """
+        Fetch IDs already stored in Qdrant"""
         existing_documents = self.__qdrant_store.filter_documents()
         existing_ids = {doc.id for doc in existing_documents}
         logger.info("Found %d document(s) already stored in Qdrant, will skip those", len(existing_ids))
         return existing_ids
 
     async def write_with_retry(self, qdrant_documents: List[Document]) -> int:
-        """Write one slice to Qdrant, retrying transient failures (timeouts,
-        connection errors) a few times before giving up on this slice."""
+        """
+        Write one slice to Qdrant, retrying failures with timeouts,
+        connection errors a few times before giving up on this slice."""
         last_error = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
@@ -93,10 +96,6 @@ class StoreEmbedding:
     async def store_embedding(self) -> int:
         """
         Embed and store documents slice by slice instead of all at once:
-        - keeps GPU memory usage bounded (small batch_size, small slice in flight)
-        - retries transient write failures instead of giving up on the first try
-        - skips documents already stored in Qdrant, so re-running after a
-          partial failure only processes what's actually missing
         """
         documents = get_documents_to_embed()
 
@@ -144,8 +143,6 @@ if __name__ == "__main__":
             logging.FileHandler(ERRORS_LOG_PATH, mode="a", encoding="utf-8"),
             logging.StreamHandler(),
         ],
-        force=True,  # embedding.py already configured the root logger on import
-                     # (targeting ingestion.log); without force=True, basicConfig()
-                     # silently no-ops here and everything keeps going to that file
+        force=True,
     )
     print(asyncio.run(main()))

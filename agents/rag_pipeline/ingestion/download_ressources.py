@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 import zipfile
 import time
-import os
 import boto3
 from pathlib import Path
-from dotenv import load_dotenv
 from botocore.config import Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-load_dotenv()
+from core.config import get_settings
+
+settings = get_settings()
 
 LOCAL_DIR = Path(__file__).parent.parent.parent / "ressources"
 
-ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "your-account-id")
-ACCESS_KEY = os.getenv("R2_ACCESS_KEY_ID", "your-access-key")
-SECRET_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "your-secret-key")
-BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "your-bucket-name")
-JURISDICTION = os.getenv("R2_JURISDICTION", "")
+ACCOUNT_ID = settings.R2_ACCOUNT_ID
+ACCESS_KEY = settings.R2_ACCESS_KEY_ID
+SECRET_KEY = settings.R2_SECRET_ACCESS_KEY
+BUCKET_NAME = settings.R2_BUCKET_NAME
+JURISDICTION = settings.R2_JURISDICTION
 
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "50"))
-MAX_WORKERS = int(os.getenv("MAX_WORKERS", "8"))
+BATCH_SIZE = settings.BATCH_SIZE
+MAX_WORKERS = settings.MAX_WORKERS
 PREFIX = ""
 
 
@@ -48,7 +48,6 @@ def download_one(bucket, key, local_dir):
     local_path = local_dir / key
     local_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Skip if already downloaded (lets you resume interrupted runs)
     if local_path.exists():
         return f"SKIP  {key}"
 

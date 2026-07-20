@@ -39,8 +39,6 @@ class DocumentSplitter:
 
             sentence_chunks = self.sentence_splitter.run(documents=[page])["documents"]
             for sentence_chunk in sentence_chunks:
-                # the sentence splitter re-counts page breaks within just this one page's
-                # text (there are none), so it would otherwise reset page_number to 1
                 sentence_chunk.meta["page_number"] = page.meta["page_number"]
             chunks.extend(sentence_chunks)
 
@@ -76,16 +74,3 @@ if __name__ == "__main__":
     for chunk in chunks[:5]:
         print(chunk.meta.get("file_name"), chunk.meta.get("page_number"), "->", chunk.content[:1000])
         print("\n")
-    """
-    chunks = document_splitter.run_splitter(documents=[sample_document])
-    for chunk_index, chunk in enumerate(chunks[:10]):
-        print("=" * 100)
-        print(f"Chunk {chunk_index}")
-        '''
-        print(f"file_name={chunk.meta.get('file_name')} "
-              f"page_number={chunk.meta.get('page_number')} "
-              f"subject={chunk.meta.get('subject')}")
-        '''
-        print(chunk.content[:2000])
-        print(chunk.meta)
-"""

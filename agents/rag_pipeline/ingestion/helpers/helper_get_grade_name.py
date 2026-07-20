@@ -16,9 +16,12 @@ SPELLED_SENIOR_PATTERN = re.compile(
 
 
 def infer_grade(file_path: Path) -> str:
-    """Guess the grade level (e.g. 'Senior 3') from the file's parent folder name or file name."""
-    # underscores are used as word separators in some file names (e.g. "Book_Senior Five"),
-    # which would otherwise defeat \b word-boundary matching since "_" counts as a word char
+    """
+    Guess the grade level (e.g. 'Senior 3') from the file's parent folder name or file name.
+    underscores are used as word separators in some file names (e.g. 'Book_Senior Five'),
+    which would otherwise defeat \b word-boundary matching since "_" counts as a word char
+    """
+
     haystack_text = f"{file_path.parent.name} {file_path.stem}".replace("_", " ")
 
     spelled_match = SPELLED_SENIOR_PATTERN.search(haystack_text)

@@ -20,7 +20,6 @@ Env vars:
 import io
 import json
 import logging
-import os
 import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -32,6 +31,9 @@ from haystack import Document
 
 from .helpers.helper_ocr import page_needs_ocr
 from .chunking import DocumentSplitter
+from core.config import get_settings
+
+settings = get_settings()
 
 RESSOURCES_ROOT = Path(__file__).parent.parent.parent / "ressources"
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
@@ -40,7 +42,7 @@ LOGS_DIR = REPO_ROOT / "server_logs"
 CACHE_PATH = CACHES_DIR / "document_split.json"
 CHUNKS_PATH = CACHES_DIR / "chunks.json"
 LOG_PATH = LOGS_DIR / "event.log"
-MAX_WORKERS = int(os.getenv("OCR_WORKERS", os.cpu_count()))
+MAX_WORKERS = settings.OCR_WORKERS
 
 CACHES_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -175,15 +177,13 @@ def main():
         cached_documents = json.load(f)
     logger.info("Loaded %d cached documents", len(cached_documents))
 
-    limit = os.getenv("OCR_LIMIT")
-    if limit:
-        cached_documents = cached_documents[:int(limit)]
-        logger.info("OCR_LIMIT set: only processing first %d documents", int(limit))
+    if settings.OCR_LIMIT:
+        cached_documents = cached_documents[:settings.OCR_LIMIT]
+        logger.info("OCR_LIMIT set: only processing first %d documents", settings.OCR_LIMIT)
 
     target_names = None
-    files_env = os.getenv("OCR_FILES")
-    if files_env:
-        target_names = {name.strip() for name in files_env.split(",") if name.strip()}
+    if settings.OCR_FILES:
+        target_names = {name.strip() for name in settings.OCR_FILES.split(",") if name.strip()}
         logger.info("OCR_FILES set: only re-OCR'ing %d target file(s): %s", len(target_names), sorted(target_names))
 
     cached_documents = run_ocr(cached_documents, target_names)

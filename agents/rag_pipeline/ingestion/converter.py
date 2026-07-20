@@ -6,7 +6,6 @@ import os
 import ebooklib
 
 from pathlib import Path
-from dotenv import load_dotenv
 from datetime import datetime, timezone
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -24,7 +23,9 @@ from .helpers.helper_get_subject_name import infer_subject
 from .helpers.helper_get_grade_name import infer_grade
 from .helpers.helper_ocr import repair_pdf_text
 
-load_dotenv()
+from core.config import get_settings
+
+settings = get_settings()
 
 document_path = Path(__file__).parent.parent.parent/"ressources"/"books_to_chunk"/"programming"
 CACHES_DIR = Path(__file__).parent.parent.parent.parent / "caches"
@@ -112,7 +113,7 @@ class Converter:
 
     def convert_doc_parallel(self,
                              items:Path,
-                             nbr_worker=int(os.getenv("MAX_WORKERS", 3))
+                             nbr_worker=settings.MAX_WORKERS
                              ):
         """run operation in parallel with threadexecutor"""
         start_time = time.perf_counter()
