@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 
-import os
 import json
 import logging
 from pathlib import Path
-from dotenv import load_dotenv
 from typing import List
 
 from haystack import Document
-from haystack.components.embedders import SentenceTransformersDocumentEmbedder
+from haystack_integrations.components.embedders.sentence_transformers import SentenceTransformersDocumentEmbedder
 from haystack.utils import ComponentDevice
 
 from agents.rag_pipeline.ingestion.helpers_embedding.handle_duplicate import deduplicate_chunks
 from agents.rag_pipeline.ingestion.helpers_embedding.fix_chunks_naming import fix_naming
+from core.config import get_settings
 
-load_dotenv()
+settings = get_settings()
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 CACHES_DIR = REPO_ROOT / "caches"
@@ -37,10 +36,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = os.getenv("MODEL_EMBEDDER", "BAAI/bge-m3")
-EMBEDDING_DIMENSION = int(os.getenv("DIMENSION", "1024"))
-EMBED_BATCH_SIZE = int(os.getenv("EMBED_BATCH_SIZE", "8"))
-EMBED_DEVICE = os.getenv("EMBED_DEVICE", "cuda:0")
+EMBEDDING_MODEL = settings.MODEL_EMBEDDER
+EMBEDDING_DIMENSION = settings.DIMENSION
+EMBED_BATCH_SIZE = settings.EMBED_BATCH_SIZE
+EMBED_DEVICE = settings.EMBED_DEVICE
 
 def clean_learning_materials(learning_chunks:Path) -> List[Document]:
     """
@@ -104,10 +103,9 @@ def get_documents_to_embed() -> List[Document]:
 
     documents = load_learning_unit(learning_unit=LEARNING_CHUNK_PATH)
 
-    limit = os.getenv("EMBED_LIMIT")
-    if limit:
-        documents = documents[:int(limit)]
-        logger.info("EMBED_LIMIT set: only embedding first %d documents", int(limit))
+    if settings.EMBED_LIMIT:
+        documents = documents[:settings.EMBED_LIMIT]
+        logger.info("EMBED_LIMIT set: only embedding first %d documents", settings.EMBED_LIMIT)
 
     return documents
 
