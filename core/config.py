@@ -57,7 +57,13 @@ class Settings(BaseSettings):
     # Gemini API key
     GOOGLE_API_KEY:str
     LLM_MODEL:str
+    LLM_MODEL_FALLBACK:str
+    GOOGLE_API_KEY_FALLBACK:str
     LLM_ENABLED:bool = False
+    ADK_SUPPRESS_GEMINI_LITELLM_WARNINGS:bool
+
+    # Tavily web search tool
+    TAVILY_API_KEY:str
 
     @field_validator("EMBED_LIMIT", "OCR_LIMIT", "OCR_FILES", mode="before")
     @classmethod
