@@ -5,6 +5,7 @@ import os
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
+from google.genai.types import GenerateContentConfig
 
 from core.config import get_settings
 from agents.schemas.learning_schema import GenerateLearningResponse
@@ -30,6 +31,13 @@ class LLMDefinition:
             instruction=self.instructions,
             tools=tools,
             output_schema=output_schema,
+            generate_content_config=GenerateContentConfig(
+                temperature=0.1,
+                top_p=0.9,
+                top_k=40,
+                max_output_tokens=8192,
+                frequency_penalty=0.3,
+            ),
         )
 
     async def learning_llm(self, agent_name="learning_llm", use_fallback:bool=False)->LlmAgent:

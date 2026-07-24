@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY_FALLBACK:str
     LLM_ENABLED:bool = False
     ADK_SUPPRESS_GEMINI_LITELLM_WARNINGS:bool
+    LLM_MAX_RETRIES:int
+    LLM_RETRY_DELAY:int
 
     # Tavily web search tool
     TAVILY_API_KEY:str
