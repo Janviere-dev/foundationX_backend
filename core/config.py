@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str
     QDRANT_COLLECTION_NAME: str
     QDRANT_TIMEOUT: int
+    TOP_K: int = 5
 
     # MongoDB Cloud
     MONGODB_URI: str
@@ -52,6 +53,11 @@ class Settings(BaseSettings):
     # Qdrant storage run tuning (agents/rag_pipeline/ingestion/store.py)
     STORE_MAX_RETRIES: int
     STORE_RETRY_DELAY: int
+
+    # Gemini API key
+    GOOGLE_API_KEY:str
+    LLM_MODEL:str
+    LLM_ENABLED:bool = False
 
     @field_validator("EMBED_LIMIT", "OCR_LIMIT", "OCR_FILES", mode="before")
     @classmethod
