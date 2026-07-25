@@ -4,11 +4,12 @@ from haystack.utils import Secret
 from haystack.dataclasses import ChatMessage
 from haystack_integrations.components.embedders.sentence_transformers import SentenceTransformersTextEmbedder
 from haystack_integrations.components.retrievers.qdrant import QdrantEmbeddingRetriever
+from qdrant_client.models import Filter, FieldCondition, MatchText
 
 from agents.rag_pipeline.qdrant_config import init_qdrant
 from haystack_integrations.components.generators.google_genai import GoogleGenAIChatGenerator
 
-from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_sentence_transformer, init_qdrant_retriever
+from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_sentence_transformer, init_remote_embedder, init_qdrant_retriever
 from core.config import get_settings
 
 class Retrieval:
@@ -20,14 +21,21 @@ class Retrieval:
         """
         This function retrieve learning content
         """
-        query_vector = self.__embedder.run(text=query)["embedding"]
+        query_vector = (await self.__embedder.run(text=query))["embedding"]
 
-        filters = {
-            "operator": "AND", "conditions": [
-                {"field": "meta.subject", "operator": "==", "value": subject},
-                {"field": "meta.grade", "operator": "==", "value": grade},
+        # Built as a native Filter with MatchText explicitly, instead of
+        # Haystack's dict-based filters: Haystack auto-picks MatchValue
+        # (needs a keyword index) for space-free values and MatchText
+        # (needs a text index) for values with a space - but Qdrant only
+        # keeps one index type per field, so relying on both meant one
+        # kind of value would always break. MatchText works correctly for
+        # single-word values too, so it's used consistently for both.
+        filters = Filter(
+            must=[
+                FieldCondition(key="meta.subject", match=MatchText(text=subject)),
+                FieldCondition(key="meta.grade", match=MatchText(text=grade)),
                 ]
-                }
+            )
         return self.__retriever.run(
             query_embedding=query_vector,
             filters=filters
@@ -40,7 +48,7 @@ def generate_content(prompt: str, context: str = "") -> str:
 
 if __name__ == "__main__":
     retrieval = Retrieval(
-        embedder=init_sentence_transformer(),
+        embedder=init_remote_embedder(),
         retriver=init_qdrant_retriever()
         )
 
