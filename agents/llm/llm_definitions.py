@@ -35,8 +35,6 @@ class LLMDefinition:
                 temperature=0.1,
                 top_p=0.9,
                 top_k=40,
-                max_output_tokens=8192,
-                frequency_penalty=0.3,
             ),
         )
 
