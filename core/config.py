@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     # Tavily web search tool
     TAVILY_API_KEY:str
 
+    # DeepInfra remote embedding API (bge-m3 hosted, avoids loading torch locally)
+    DEEP_INFRA_KEY:str
+    DEEPINFRA_EMBED_MODEL:str = "BAAI/bge-m3"
+
     @field_validator("EMBED_LIMIT", "OCR_LIMIT", "OCR_FILES", mode="before")
     @classmethod
     def blank_to_none(cls, value):
