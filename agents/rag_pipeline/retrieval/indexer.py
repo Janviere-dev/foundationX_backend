@@ -11,8 +11,10 @@ FIELDS_TO_INDEX = [
     ("meta.subject", PayloadSchemaType.KEYWORD),
     ("meta.grade", PayloadSchemaType.KEYWORD),
     # Haystack's Qdrant filter converter switches to a full-text MatchText
-    # query for any string value containing a space (e.g. "Senior 3"), which
-    # needs its own text-type index separate from the keyword one.
+    # query for any string value containing a space (e.g. "Senior 3",
+    # "Computer Science"), which needs its own text-type index separate
+    # from the keyword one - both fields can see multi-word values.
+    ("meta.subject", PayloadSchemaType.TEXT),
     ("meta.grade", PayloadSchemaType.TEXT),
 ]
 

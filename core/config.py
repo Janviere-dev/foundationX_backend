@@ -61,9 +61,15 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY_FALLBACK:str
     LLM_ENABLED:bool = False
     ADK_SUPPRESS_GEMINI_LITELLM_WARNINGS:bool
+    LLM_MAX_RETRIES:int
+    LLM_RETRY_DELAY:int
 
     # Tavily web search tool
     TAVILY_API_KEY:str
+
+    # DeepInfra remote embedding API (bge-m3 hosted, avoids loading torch locally)
+    DEEP_INFRA_KEY:str
+    DEEPINFRA_EMBED_MODEL:str = "BAAI/bge-m3"
 
     @field_validator("EMBED_LIMIT", "OCR_LIMIT", "OCR_FILES", mode="before")
     @classmethod
