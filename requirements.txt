@@ -17,7 +17,6 @@ pymupdf==1.28.0
 pytesseract==0.3.13
 pillow==12.3.0
 
-
 # cloudflare
 boto3==1.43.52
 
@@ -29,6 +28,7 @@ litellm==1.93.0
 google-genai-haystack==4.5.0
 qdrant-haystack==10.3.1
 google-adk==2.5.0
+tavily-python==0.7.26
 haystack-ai==3.0.0
 qdrant-client==1.18.0
 nltk==3.10.0
