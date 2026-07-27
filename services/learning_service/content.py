@@ -43,9 +43,6 @@ async def get_content(request: GenerateLearningContentRequest) -> GenerateLearni
 
     response = GenerateLearningResponse.model_validate_json(result)
 
-    # The model never sees document.meta (only the raw chunk text), so it
-    # can't reliably report book_name/page_number/similarity_score itself -
-    # replace its guess with the real retrieval data we already have.
     response.rag_enabled = bool(documents)
     response.retrival_details = [
         RetreivedChunks(
