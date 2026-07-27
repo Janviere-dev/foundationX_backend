@@ -23,14 +23,16 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 logger = logging.getLogger(__name__)
 
 class Agents:
-    def __init__(self, instructions:str, prompt:str):
+    def __init__(self, instructions:str, prompt:str, agent_builder:str = "learning_llm"):
         self.__instruction = instructions
         self.__prompt = prompt
         self.llm_definition = LLMDefinition(instructions=self.__instruction, prompt=self.__prompt)
         self.__session_service = InMemorySessionService()
+        self.__agent_builder = agent_builder
 
     async def build(self, agent_name:str = "learning_llm", use_fallback:bool = False):
-        return await self.llm_definition.learning_llm(agent_name=agent_name, use_fallback=use_fallback)
+        build_method = getattr(self.llm_definition, self.__agent_builder)
+        return await build_method(agent_name=agent_name, use_fallback=use_fallback)
 
     async def __run_with_agent(self, agent, user_id:str) -> str:
         runner = Runner(agent=agent, app_name=APP_NAME, session_service=self.__session_service)
@@ -118,10 +120,3 @@ if __name__ == "__main__":
         agent_name="learning_agent"
         ))
     print(result)
-    print("______________________________________________________________")
-    tab_count = result.count("\t")
-    print(f"\nLiteral tab characters (\\t) in raw response: {tab_count}")
-    if tab_count:
-        first_index = result.index("\t")
-        print("First occurrence, repr() of surrounding text:")
-        print(repr(result[max(0, first_index - 30):first_index + 10]))
