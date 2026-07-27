@@ -63,3 +63,15 @@ class GenerateLearningResponse(BaseModel):
     rag_enabled:bool = Field(description="True if chunks retrieved and False if not")
     retrival_details:List[RetreivedChunks]
     external_sources:Optional[External_ressources] = Field(description="External sources field", default=None)
+
+class LearningResponsePayload(BaseModel):
+    """
+    What the model actually needs to produce via the submit_learning_response
+    tool. subject/grade are already known from the request, and
+    rag_enabled/retrival_details get filled in afterward from the real
+    retrieval results - the model never needs to reproduce them, so they're
+    left out of this smaller schema to keep the tool call simpler.
+    """
+    learning_plan:List[str] = Field(description="Steps by steps Lesson plan")
+    learning_content:str = Field(description="Lesson content")
+    checkpoints_questions_response:List[Checkpoint_question] = Field(description="Checkpoint questions")
