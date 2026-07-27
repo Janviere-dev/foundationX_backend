@@ -64,8 +64,15 @@ class Settings(BaseSettings):
     LLM_MAX_RETRIES:int
     LLM_RETRY_DELAY:int
 
+    # OpenRouter (paid, used only when LLM_ENABLED=true) vs free direct
+    # Gemini (used when LLM_ENABLED=false) - see LLMDefinition.llm_definition()
+    OPEN_ROUTER_KEY:str
+    LLM_MODEL_FREE:str
+    GOOGLE_API_KEY_FREE:str
+
     # Tavily web search tool
     TAVILY_API_KEY:str
+    SEARCH_DEPTH:str = "basic"
 
     # DeepInfra remote embedding API (bge-m3 hosted, avoids loading torch locally)
     DEEP_INFRA_KEY:str
