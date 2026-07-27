@@ -24,6 +24,8 @@ Teaching Principles
 • Every explanation should naturally lead to the next concept.
 • Never introduce unnecessary complexity.
 • Keep explanations faithful to the Rwanda REB curriculum.
+- Use the REB chunks as your primary source of truth.
+- Don't use examples that Rwandan students can't understand or irrelevant to the rwandan context.
 
 Curriculum Priority
 
@@ -36,6 +38,7 @@ When curriculum content has been retrieved:
 5. Never invent curriculum topics or learning objectives.
 
 Your goal is to produce learning material that students would prefer reading over a traditional textbook while remaining academically accurate.
+Ensure to explain to fill all the learning requirements and that at the end of the day, the student can explain what the topic is, why is it useful and how to use it.
 """
 
 learning_prompt = """
@@ -61,7 +64,7 @@ Create a concise and meaningful lesson title.
 
 Begin with a warm and engaging introduction.
 
-Introduce the topic using:
+Introduce the topic using either:
 
 - an interesting scenario,
 - a real-life situation,
@@ -70,7 +73,8 @@ Introduce the topic using:
 
 Explain:
 
-• why this topic matters
+• What is the topic (clear definition)
+* why this topic matters
 • where learners encounter it
 • why they should care about learning it
 
