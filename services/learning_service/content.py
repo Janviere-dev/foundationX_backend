@@ -1,13 +1,24 @@
 #!/usr/bin/env python3
 
 import uuid
+from datetime import datetime, timezone
 from functools import lru_cache
+from typing import Optional
 
 from core.config import get_settings
 from agents.prompts.learning_prompt import learning_instruction, learning_prompt
 from agents.rag_pipeline.retrieval.retriever import Retrieval
 from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_remote_embedder, init_qdrant_retriever
-from agents.schemas.learning_schema import GenerateLearningContentRequest, GenerateLearningResponse
+from agents.schemas.learning_schema import (
+    GenerateLearningContentRequest,
+    GenerateLearningResponse,
+    LearningResponsePayload,
+    )
+from db.repositories.learning_content_repository import LearningContentRepository
+from db.redis.save_generated_learning_content import (
+    cache_learning_content,
+    get_cached_learning_content,
+    )
 from services.learning_service.helper_learning_service import (
     build_context,
     with_context,
@@ -21,6 +32,7 @@ class LearningContent:
             embedder=init_remote_embedder(),
             retriver=init_qdrant_retriever(),
             )
+        self.content_repository = LearningContentRepository()
 
     async def get_content(self, request: GenerateLearningContentRequest) -> GenerateLearningResponse:
         retrieved = await self.retriever.retrieve_learning_content(
@@ -45,19 +57,71 @@ class LearningContent:
             agent_name="learning_llm",
             )
 
-        response = GenerateLearningResponse.model_validate_json(result)
+        payload = LearningResponsePayload.model_validate_json(result)
 
-        response.rag_enabled = bool(documents)
-        response.external_sources = None
-        response.retrival_details = [
-            document_to_retrieved_chunk(
-                document,
-                subject=request.subject,
-                learning_query=request.learning_query,
-                total_retrieved=len(documents),
-                )
-            for document in documents
-            ]
+        response = GenerateLearningResponse(
+            content_id=str(uuid.uuid4()),
+            user_id=request.user_id,
+            subject=request.subject,
+            grade=request.grade,
+            learning_plan=payload.learning_plan,
+            learning_content=payload.learning_content,
+            checkpoints_questions_response=payload.checkpoints_questions_response,
+            rag_enabled=bool(documents),
+            external_sources=None,
+            is_complete=False,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            retrival_details=[
+                document_to_retrieved_chunk(
+                    document,
+                    subject=request.subject,
+                    learning_query=request.learning_query,
+                    total_retrieved=len(documents),
+                    )
+                for document in documents
+                ],
+            )
+
+        await self.content_repository.create_content(
+            content_id=response.content_id,
+            document=response.model_dump(mode="json"),
+            )
+        await cache_learning_content(content_id=response.content_id, document_json=response.model_dump_json())
+
+        return response
+
+    async def get_saved_content(self, content_id: str, user_id: str) -> Optional[GenerateLearningResponse]:
+        """Cache-aside read: check Redis first, fall back to MongoDB (the
+        permanent copy) on a miss and repopulate the cache. A lesson never
+        disappears just because the cache expired or was evicted."""
+        cached_json = await get_cached_learning_content(content_id)
+        if cached_json is not None:
+            response = GenerateLearningResponse.model_validate_json(cached_json)
+            if response.user_id != user_id:
+                return None
+            return response
+
+        document = await self.content_repository.get_content(content_id)
+        if document is None or document.get("user_id") != user_id:
+            return None
+
+        response = GenerateLearningResponse.model_validate(document)
+        await cache_learning_content(content_id=content_id, document_json=response.model_dump_json())
+        return response
+
+    async def mark_complete(self, content_id: str, user_id: str) -> Optional[GenerateLearningResponse]:
+        """Mark a lesson as completed by the student. Updates MongoDB (the
+        source of truth) and refreshes the cache so it doesn't keep
+        serving a stale is_complete=False copy."""
+        document = await self.content_repository.get_content(content_id)
+        if document is None or document.get("user_id") != user_id:
+            return None
+
+        await self.content_repository.mark_complete(content_id=content_id)
+
+        response = GenerateLearningResponse.model_validate(document)
+        response.is_complete = True
+        await cache_learning_content(content_id=content_id, document_json=response.model_dump_json())
 
         return response
 
