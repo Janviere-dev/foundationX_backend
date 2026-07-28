@@ -44,8 +44,8 @@ async def search_web_articles(
         ) -> dict:
     """
     This tool searches the web for articles and further reading on a topic.
-    Use this tool whenever you need to supplement the chunks with further information
-    and when you suggest user sources for funding reading on the topic
+    You may use this tool whenever you need to supplement the chunks with further information
+    and when the user specifically ask for further ressources. Select only two best article/book that explains the topic
     Args:
         query: the topic to search for
     """
@@ -71,8 +71,8 @@ async def search_web_videos(
         ) -> dict:
     """
     This tool searches the web for videos and further tutorials.
-    Use this tool whenever you need to supplement the chunks with further information
-    and when you suggest user sources for funding reading on the topic
+    You may use this tool whenever you need to supplement the chunks with further information
+    and when the user request for further ressources. Select only one best video tutorial
     Args:
         query: The topic to search for videos about.
     """
