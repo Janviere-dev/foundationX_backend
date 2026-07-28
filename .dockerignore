@@ -1,0 +1,12 @@
+.env
+.git
+.gitignore
+venv/
+.venv/
+__pycache__/
+*.pyc
+caches/
+server_logs/
+push_github.sh
+.pytest_cache/
+*.md
