@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator, AnyHttpUrl
 
 class GenerateLearningContentRequest(BaseModel):
     """Base class for generating learning content"""
+    user_id:str = Field(description="User requesting the learning content")
     learning_query:str = Field(description="Question to send to the learning agent")
     grade:str = Field(description="Student current grade eg.Senior 6")
     subject:str = Field(description="Subject the student need to learn eg.Calculus/Quadratic Equations")
@@ -55,6 +56,8 @@ class GenerateLearningResponse(BaseModel):
     """
     Base class for learning response
     """
+    content_id:str = Field(description="ID of this generated learning content")
+    user_id:str = Field(description="User this learning content was generated for")
     subject:str = Field(description="Learning subject")
     grade:str = Field(description="Student current grade")
     learning_plan:List[str] = Field(description="Steps by steps Lesson plan")
@@ -63,3 +66,17 @@ class GenerateLearningResponse(BaseModel):
     rag_enabled:bool = Field(description="True if chunks retrieved and False if not")
     retrival_details:List[RetreivedChunks]
     external_sources:Optional[External_ressources] = Field(description="External sources field", default=None)
+    is_complete:bool = Field(description="True once the student has finished this lesson", default=False)
+    created_at:Optional[str] = Field(description="When this learning content was generated", default=None)
+
+class LearningResponsePayload(BaseModel):
+    """
+    What the model actually needs to produce via the submit_learning_response
+    tool. subject/grade are already known from the request, and
+    rag_enabled/retrival_details get filled in afterward from the real
+    retrieval results - the model never needs to reproduce them, so they're
+    left out of this smaller schema to keep the tool call simpler.
+    """
+    learning_plan:List[str] = Field(description="Steps by steps Lesson plan")
+    learning_content:str = Field(description="Lesson content")
+    checkpoints_questions_response:List[Checkpoint_question] = Field(description="Checkpoint questions")

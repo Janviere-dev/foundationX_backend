@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import asyncio
+from typing import TYPE_CHECKING
+
 from haystack.utils import Secret
 from haystack.dataclasses import ChatMessage
-from haystack_integrations.components.embedders.sentence_transformers import SentenceTransformersTextEmbedder
 from haystack_integrations.components.retrievers.qdrant import QdrantEmbeddingRetriever
 from qdrant_client.models import Filter, FieldCondition, MatchText
 
 from agents.rag_pipeline.qdrant_config import init_qdrant
 from haystack_integrations.components.generators.google_genai import GoogleGenAIChatGenerator
 
-from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_sentence_transformer, init_remote_embedder, init_qdrant_retriever
+from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_remote_embedder, init_qdrant_retriever
 from core.config import get_settings
 
+if TYPE_CHECKING:
+    from haystack_integrations.components.embedders.sentence_transformers import SentenceTransformersTextEmbedder
+
 class Retrieval:
-    def __init__(self, embedder:SentenceTransformersTextEmbedder, retriver:QdrantEmbeddingRetriever):
+    def __init__(self, embedder:"SentenceTransformersTextEmbedder", retriver:QdrantEmbeddingRetriever):
         self.__embedder = embedder
         self.__retriever = retriver
 

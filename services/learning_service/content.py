@@ -1,65 +1,131 @@
 #!/usr/bin/env python3
 
 import uuid
+from datetime import datetime, timezone
+from functools import lru_cache
+from typing import Optional
 
 from core.config import get_settings
-from agents.adk.build import Agents
 from agents.prompts.learning_prompt import learning_instruction, learning_prompt
 from agents.rag_pipeline.retrieval.retriever import Retrieval
 from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_remote_embedder, init_qdrant_retriever
 from agents.schemas.learning_schema import (
     GenerateLearningContentRequest,
     GenerateLearningResponse,
-    RetreivedChunks,
-    ChunkDetail,
+    LearningResponsePayload,
+    )
+from db.repositories.learning_content_repository import LearningContentRepository
+from db.redis.save_generated_learning_content import (
+    cache_learning_content,
+    get_cached_learning_content,
+    )
+from services.learning_service.helper_learning_service import (
+    build_context,
+    with_context,
+    run_agent,
+    document_to_retrieved_chunk,
     )
 
-async def get_content(request: GenerateLearningContentRequest) -> GenerateLearningResponse:
-    retrieval = Retrieval(
-        embedder=init_remote_embedder(),
-        retriver=init_qdrant_retriever(),
-        )
-    retrieved = await retrieval.retrieve_learning_content(
-        query=request.learning_query,
-        grade=request.grade,
-        subject=request.subject,
-        top_int=get_settings().TOP_K,
-        )
-    documents = retrieved["documents"]
-    context = "\n\n---\n\n".join(document.content for document in documents)
-
-    instruction = learning_instruction.format(
-        grade=request.grade,
-        subject=request.subject,
-        learning_query=request.learning_query,
-        )
-    instruction = f"Context:\n{context}\n\n{instruction}"
-
-    agent = Agents(instructions=instruction, prompt=learning_prompt)
-    result = await agent.run(
-        user_id=str(uuid.uuid4()),
-        agent_name="learning_llm",
-        )
-
-    response = GenerateLearningResponse.model_validate_json(result)
-
-    # The model never sees document.meta (only the raw chunk text), so it
-    # can't reliably report book_name/page_number/similarity_score itself -
-    # replace its guess with the real retrieval data we already have.
-    response.rag_enabled = bool(documents)
-    response.retrival_details = [
-        RetreivedChunks(
-            course=request.subject,
-            lessons=[request.learning_query],
-            book_name=document.meta.get("file_name"),
-            page_number=[document.meta["page_number"]] if document.meta.get("page_number") is not None else None,
-            chunk_retrived=len(documents),
-            chunk_detail=ChunkDetail(
-                chunk_content=document.content,
-                similarity_score=document.score,
-                ),
+class LearningContent:
+    def __init__(self):
+        self.retriever = Retrieval(
+            embedder=init_remote_embedder(),
+            retriver=init_qdrant_retriever(),
             )
-        for document in documents
-        ]
+        self.content_repository = LearningContentRepository()
 
-    return response
+    async def get_content(self, request: GenerateLearningContentRequest) -> GenerateLearningResponse:
+        retrieved = await self.retriever.retrieve_learning_content(
+            query=request.learning_query,
+            grade=request.grade,
+            subject=request.subject,
+            top_int=get_settings().TOP_K,
+            )
+        documents = retrieved["documents"]
+
+        instruction = learning_instruction.format(
+            grade=request.grade,
+            subject=request.subject,
+            learning_query=request.learning_query,
+            )
+        instruction = with_context(instruction, build_context(documents))
+
+        result = await run_agent(
+            instruction=instruction,
+            prompt=learning_prompt,
+            user_id=str(uuid.uuid4()),
+            agent_name="learning_llm",
+            )
+
+        payload = LearningResponsePayload.model_validate_json(result)
+
+        response = GenerateLearningResponse(
+            content_id=str(uuid.uuid4()),
+            user_id=request.user_id,
+            subject=request.subject,
+            grade=request.grade,
+            learning_plan=payload.learning_plan,
+            learning_content=payload.learning_content,
+            checkpoints_questions_response=payload.checkpoints_questions_response,
+            rag_enabled=bool(documents),
+            external_sources=None,
+            is_complete=False,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            retrival_details=[
+                document_to_retrieved_chunk(
+                    document,
+                    subject=request.subject,
+                    learning_query=request.learning_query,
+                    total_retrieved=len(documents),
+                    )
+                for document in documents
+                ],
+            )
+
+        await self.content_repository.create_content(
+            content_id=response.content_id,
+            document=response.model_dump(mode="json"),
+            )
+        await cache_learning_content(content_id=response.content_id, document_json=response.model_dump_json())
+
+        return response
+
+    async def get_saved_content(self, content_id: str, user_id: str) -> Optional[GenerateLearningResponse]:
+        """Cache-aside read: check Redis first, fall back to MongoDB (the
+        permanent copy) on a miss and repopulate the cache. A lesson never
+        disappears just because the cache expired or was evicted."""
+        cached_json = await get_cached_learning_content(content_id)
+        if cached_json is not None:
+            response = GenerateLearningResponse.model_validate_json(cached_json)
+            if response.user_id != user_id:
+                return None
+            return response
+
+        document = await self.content_repository.get_content(content_id)
+        if document is None or document.get("user_id") != user_id:
+            return None
+
+        response = GenerateLearningResponse.model_validate(document)
+        await cache_learning_content(content_id=content_id, document_json=response.model_dump_json())
+        return response
+
+    async def mark_complete(self, content_id: str, user_id: str) -> Optional[GenerateLearningResponse]:
+        """Mark a lesson as completed by the student. Updates MongoDB (the
+        source of truth) and refreshes the cache so it doesn't keep
+        serving a stale is_complete=False copy."""
+        document = await self.content_repository.get_content(content_id)
+        if document is None or document.get("user_id") != user_id:
+            return None
+
+        await self.content_repository.mark_complete(content_id=content_id)
+
+        response = GenerateLearningResponse.model_validate(document)
+        response.is_complete = True
+        await cache_learning_content(content_id=content_id, document_json=response.model_dump_json())
+
+        return response
+
+
+@lru_cache
+def get_learning_content_service() -> LearningContent:
+    return LearningContent()

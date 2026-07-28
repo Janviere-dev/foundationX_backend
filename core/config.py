@@ -64,12 +64,27 @@ class Settings(BaseSettings):
     LLM_MAX_RETRIES:int
     LLM_RETRY_DELAY:int
 
+    # OpenRouter (paid, used only when LLM_ENABLED=true) vs free direct
+    # Gemini (used when LLM_ENABLED=false) - see LLMDefinition.llm_definition()
+    OPEN_ROUTER_KEY:str
+    LLM_MODEL_FREE:str
+    GOOGLE_API_KEY_FREE:str
+
     # Tavily web search tool
     TAVILY_API_KEY:str
+    SEARCH_DEPTH:str = "basic"
 
     # DeepInfra remote embedding API (bge-m3 hosted, avoids loading torch locally)
     DEEP_INFRA_KEY:str
     DEEPINFRA_EMBED_MODEL:str = "BAAI/bge-m3"
+
+    # Redis cache
+    REDIS_URL:str = "redis://localhost:6379/0"
+    REDIS_MAX_CONNECTIONS:int = 20
+    REDIS_SOCKET_TIMEOUT:int = 5
+    REDIS_MAX_RETRIES:int = 3
+    QUIZ_ABANDON_TIMEOUT_SECONDS:int = 1800
+    LEARNING_CONTENT_EXPIRE_MINUTES:int = 10080
 
     @field_validator("EMBED_LIMIT", "OCR_LIMIT", "OCR_FILES", mode="before")
     @classmethod
@@ -77,7 +92,6 @@ class Settings(BaseSettings):
         if value == "":
             return None
         return value
-
 
 @lru_cache
 def get_settings() -> Settings:

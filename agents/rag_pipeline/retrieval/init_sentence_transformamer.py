@@ -1,18 +1,26 @@
+from __future__ import annotations
+
 from functools import lru_cache
 
 import aiohttp
-from haystack.utils import ComponentDevice, Secret
-from haystack_integrations.components.embedders.sentence_transformers import SentenceTransformersTextEmbedder
 from haystack_integrations.components.retrievers.qdrant import QdrantEmbeddingRetriever
 
 from core.config import get_settings
 from agents.rag_pipeline.qdrant_config import init_qdrant
 
 @lru_cache
-def init_sentence_transformer() -> SentenceTransformersTextEmbedder:
+def init_sentence_transformer() -> "SentenceTransformersTextEmbedder":
     """
-    Init sentence transformer
+    Init sentence transformer. Imports are local to this function - this is
+    the only place in the app that needs sentence-transformers/torch, and
+    production deployments (which use init_remote_embedder() instead) don't
+    install those packages at all. Importing them at module level here
+    would force every caller of this module to pull them in just to import
+    the file, even if this function is never called.
     """
+    from haystack.utils import ComponentDevice
+    from haystack_integrations.components.embedders.sentence_transformers import SentenceTransformersTextEmbedder
+
     settings = get_settings()
     embedder = SentenceTransformersTextEmbedder(
         model=settings.MODEL_EMBEDDER,
