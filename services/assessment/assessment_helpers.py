@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from agents.adk.build import Agents
 from agents.schemas.learning_schema import QuestionDetail
-from agents.schemas.quiz_generator_schema import SourceChunk
+from agents.schemas.quiz_generator_schema import SourceChunk, QuizzLevel
 from agents.schemas.quizz_assessor_schema import QuestionFeedback, ResourceReference, UserResponse
+
+
+def build_difficulty_instruction(quizz_level: Optional[QuizzLevel]) -> str:
+    """Resolve the requested difficulty level into a clear, unconditional
+    instruction - this decision is made here in Python instead of asking
+    the model to parse a conditional in the prompt text."""
+    if quizz_level is None:
+        return (
+            "Distribute difficulty roughly evenly across the questions: "
+            "about 1/3 easy, 1/3 medium, and 1/3 hard."
+            )
+    return (
+        f"The student specifically requested a {quizz_level.value}-level quiz. "
+        f"Generate ALL questions at {quizz_level.value} difficulty - do not mix in other difficulty levels."
+        )
 
 
 def document_to_source_chunk(document) -> SourceChunk:
