@@ -12,7 +12,7 @@ from google.genai.types import (
     )
 
 from core.config import get_settings
-from agents.schemas.learning_schema import GenerateLearningResponse
+from agents.schemas.learning_schema import LearningResponsePayload
 from agents.schemas.quiz_generator_schema import QuizzQuestionPayload
 from agents.schemas.quizz_assessor_schema import QuizzAssessmentPayload
 
@@ -64,7 +64,7 @@ class LLMDefinition:
     async def learning_llm(self, agent_name="learning_llm", use_fallback:bool=False)->LlmAgent:
         return self.llm_definition(
             agent_name=agent_name,
-            output_schema=GenerateLearningResponse,
+            output_schema=LearningResponsePayload,
             use_fallback=use_fallback,
         )
 
