@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 
 from typing import Optional, List, Dict
+from enum import Enum
 from pydantic import BaseModel, field_validator, Field
 from .learning_schema import GenerateLearningContentRequest, QuestionDetail
 
+class QuizzLevel(str, Enum):
+    Easy = "easy"
+    Medium = "medium"
+    Hard = "hard"
+
+class QuizzStatus(str, Enum):
+    Started = "started"
+    Completed = "completed"
+    Abandoned = "abandoned"
+
 class QuizzQuestionRequest(GenerateLearningContentRequest):
-    """
-    Quizz base request. session_id is intentionally not part of the request -
-    it's server-generated per quiz so it can never collide, and only ever
-    goes out in the response.
-    """
-    user_id:str = Field(description="User asking question ID")
     number_question:int = Field(description="How many questions do the student want", ge=5, le=30)
+    quizz_level:Optional[QuizzLevel] = Field(description="Quizz level default if provided, if not, fall back to agent owns generation", default=None)
 
 class SourceChunk(BaseModel):
     """
@@ -23,12 +29,6 @@ class SourceChunk(BaseModel):
     similarity_score:float = Field(description="Retrieval similarity score")
 
 class QuizzQuestionPayload(BaseModel):
-    """
-    What the model actually needs to produce via output_schema.
-    user_id/session_id/grade/subject/learning_query are already known from
-    the request, and number_questions/complete are derived in code from
-    len(question_details) - the model only needs to produce the questions.
-    """
     question_details:List[QuestionDetail] = Field(description="Each question details and response")
 
 class QuizzQuestionResponse(BaseModel):
@@ -41,6 +41,9 @@ class QuizzQuestionResponse(BaseModel):
     learning_query:str = Field(description="User provided learning subject")
     subject:str = Field(description="Subject tight with the user query")
     number_questions:int = Field(description="Number of question user asked", ge=5, le=30)
+    quizz_level:Optional[QuizzLevel] = Field(description="Choosen level quizz questions default to agent generated quizz if not provided", default=None)
     question_details:List[QuestionDetail] = Field(description="Each question details and response")
     questions_sources:List[SourceChunk] = Field(description="Question sources")
-    complete:bool = Field(description="True if quizz completed and False if not", default=True)
+    status:QuizzStatus = Field(description="Current quizz status", default=QuizzStatus.Started)
+    created_at:Optional[str] = Field(description="When the quizz was generated", default=None)
+    end_time:Optional[str] = Field(description="When the quizz was completed or abandoned", default=None)
