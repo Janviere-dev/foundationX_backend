@@ -86,6 +86,10 @@ class Settings(BaseSettings):
     QUIZ_ABANDON_TIMEOUT_SECONDS:int = 1800
     LEARNING_CONTENT_EXPIRE_MINUTES:int = 10080
 
+    # Firebase
+    PATH_TO_FIREBASE:str
+    FIREBASE_WEB_API_KEY:str
+
     @field_validator("EMBED_LIMIT", "OCR_LIMIT", "OCR_FILES", mode="before")
     @classmethod
     def blank_to_none(cls, value):

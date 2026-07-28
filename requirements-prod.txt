@@ -25,3 +25,6 @@ tavily-python==0.7.26
 haystack-ai==3.0.0
 qdrant-client==1.18.0
 nltk==3.10.0
+
+# firebase admin
+firebase-admin==7.5.0

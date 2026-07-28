@@ -11,3 +11,6 @@ caches/
 server_logs/
 FoundationX_Backend_Development_Plan_v2.docx
 planning.pdf
+foundationx_service_account.json
+test_firebase.sh
+start.sh
