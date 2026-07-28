@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Optional
 from uuid import uuid4
@@ -16,6 +17,7 @@ from agents.schemas.quiz_generator_schema import (
     QuizzQuestionRequest,
     QuizzQuestionResponse,
     QuizzQuestionPayload,
+    QuizzStatus,
     SourceChunk,
     )
 from agents.schemas.quizz_assessor_schema import (
@@ -27,6 +29,7 @@ from agents.schemas.quizz_assessor_schema import (
     )
 from db.repositories.quiz_repository import QuizSessionRepository
 from db.repositories.quiz_report_repository import QuizReportRepository
+from db.redis.save_generated_quizz import save_generated_quizz, get_cached_quizz, delete_cached_quizz
 from services.assessment.assessment_helpers import (
     document_to_source_chunk,
     build_context,
@@ -35,9 +38,23 @@ from services.assessment.assessment_helpers import (
     grade_answers,
     build_resources,
     build_quiz_results_summary,
+    build_difficulty_instruction,
     )
 
 logger = logging.getLogger(__name__)
+
+
+class IncompleteQuizError(Exception):
+    """Raised when a student tries to start a new quiz while a previous one
+    is still resumable. Carries the full saved quiz so the router can hand
+    it back to the client instead of just an error message."""
+    def __init__(self, quizz_response: QuizzQuestionResponse):
+        self.quizz_response = quizz_response
+        super().__init__(
+            f"User {quizz_response.user_id} already has an incomplete quiz "
+            f"(quizz_id={quizz_response.quizz_id}) - finish and submit it before starting a new one."
+            )
+
 
 class Assessment:
     def __init__(self):
@@ -51,14 +68,18 @@ class Assessment:
     async def generate_questions(self, quizz_request:QuizzQuestionRequest) -> QuizzQuestionResponse:
         """
         This function generates quizz question. A student must finish
-        (grade) their current quiz before starting a new one.
+        their current quiz before starting a new one - unless the current
+        one has expired out of Redis without being finished, in which case
+        it's marked abandoned and a new quiz is allowed.
         """
         pending_session = await self.quiz_repository.find_incomplete_session(quizz_request.user_id)
         if pending_session is not None:
-            raise ValueError(
-                f"User {quizz_request.user_id} already has an incomplete quiz "
-                f"(quizz_id={pending_session['_id']}) - finish and submit it before starting a new one."
-                )
+            pending_quizz_id = pending_session["_id"]
+            cached_json = await get_cached_quizz(pending_quizz_id)
+            if cached_json is not None:
+                raise IncompleteQuizError(QuizzQuestionResponse.model_validate_json(cached_json))
+            # The resumable window expired without the student finishing it.
+            await self.quiz_repository.mark_abandoned(pending_quizz_id)
 
         quizz_id = str(uuid4())
 
@@ -74,7 +95,9 @@ class Assessment:
         instruction = quiz_question_instruction.format(
             grade=quizz_request.grade,
             subject=quizz_request.subject,
+            learning_query=quizz_request.learning_query,
             number_questions=quizz_request.number_question,
+            difficulty_instruction=build_difficulty_instruction(quizz_request.quizz_level),
             )
         instruction = with_context(instruction, build_context(source_chunks))
 
@@ -95,23 +118,26 @@ class Assessment:
             learning_query=quizz_request.learning_query,
             subject=quizz_request.subject,
             number_questions=len(payload.question_details),
+            quizz_level=quizz_request.quizz_level,
             question_details=payload.question_details,
             questions_sources=source_chunks,
-            complete=True,
+            status=QuizzStatus.Started,
+            created_at=datetime.now(timezone.utc).isoformat(),
             )
 
         await self.quiz_repository.create_session(
             quizz_id=quizz_id,
             document=response.model_dump(mode="json"),
             )
+        await save_generated_quizz(quizz_id=quizz_id, document_json=response.model_dump_json())
 
         return response
 
     async def submit_answers(self, assessment_request:QuizzAssessmentRequest) -> QuizzSubmissionAck:
         """
-        Store the student's submitted answers. Grading itself runs
-        separately as a background task (see grade_quiz) so this returns
-        immediately instead of waiting on the LLM call.
+        Store the student's submitted answers and mark the quiz completed -
+        this is the point where the student is done with it, regardless of
+        whether grading (a separate background step) succeeds afterward.
         """
         session = await self.quiz_repository.get_session(assessment_request.quizz_id)
         if session is None:
@@ -121,6 +147,8 @@ class Assessment:
             quizz_id=assessment_request.quizz_id,
             responses=[response.model_dump(mode="json") for response in assessment_request.responses],
             )
+        await self.quiz_repository.mark_completed(quizz_id=assessment_request.quizz_id)
+        await delete_cached_quizz(quizz_id=assessment_request.quizz_id)
 
         return QuizzSubmissionAck(quizz_id=assessment_request.quizz_id, status="grading")
 
@@ -178,7 +206,6 @@ class Assessment:
                 quizz_id=quizz_id,
                 report=report.model_dump(mode="json"),
                 )
-            await self.quiz_repository.mark_graded(quizz_id=quizz_id)
         except Exception:
             logger.exception("grade_quiz failed for quizz_id=%s", quizz_id)
 
