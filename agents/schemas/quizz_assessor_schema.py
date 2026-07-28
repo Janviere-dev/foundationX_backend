@@ -1,6 +1,7 @@
 from uuid import uuid4
 from pydantic import BaseModel, field_validator, Field
 from typing import List, Dict, Optional
+from .quiz_generator_schema import QuizzLevel
 
 class UserResponse(BaseModel):
     """A single answer submitted by the student for one quiz question."""
@@ -70,6 +71,7 @@ class QuizzAssessmentReport(BaseModel):
     subject:str
     score:int
     total_questions:int
+    quizz_level:Optional[QuizzLevel] = Field(description="Student choosen quizz level default to false if not provided", default=None)
     question_feedback:List[QuestionFeedback]
     strengths:List[str] = Field(description="What the student demonstrated understanding of")
     growth_areas:List[str] = Field(description="Where understanding needs improvement, framed constructively")
