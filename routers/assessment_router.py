@@ -5,7 +5,7 @@ import logging
 import openai
 from fastapi import BackgroundTasks, HTTPException
 from fastapi.routing import APIRouter
-from services.assessment.assessment import get_assessment_service
+from services.assessment.assessment import get_assessment_service, IncompleteQuizError
 from agents.schemas.quiz_generator_schema import QuizzQuestionRequest, QuizzQuestionResponse
 from agents.schemas.quizz_assessor_schema import QuizzAssessmentRequest, QuizzAssessmentReport, QuizzSubmissionAck
 
@@ -23,9 +23,10 @@ async def generate_quizz(
         return await get_assessment_service().generate_questions(
             quizz_request=quizz_payload
             )
-    except ValueError as error:
-        # the student already has an incomplete quiz pending
-        raise HTTPException(status_code=409, detail=str(error))
+    except IncompleteQuizError as error:
+        # the student already has an incomplete quiz pending - hand back
+        # the full saved quiz so the client can resume it directly
+        raise HTTPException(status_code=409, detail=error.quizz_response.model_dump(mode="json"))
     except openai.APIError:
         raise HTTPException(
             status_code=503,
