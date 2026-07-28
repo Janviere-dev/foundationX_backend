@@ -38,3 +38,29 @@ async def generate_lesson(
             status_code=503,
             detail="Learning agent not available.",
             )
+
+@router.get("/{content_id}", response_model=GenerateLearningResponse)
+async def get_lesson(
+    content_id:str,
+    user_id:str,
+    ) -> GenerateLearningResponse:
+    response = await get_learning_content_service().get_saved_content(content_id=content_id, user_id=user_id)
+    if response is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Lesson not found, or does not belong to this user.",
+            )
+    return response
+
+@router.patch("/{content_id}/complete", response_model=GenerateLearningResponse)
+async def complete_lesson(
+    content_id:str,
+    user_id:str,
+    ) -> GenerateLearningResponse:
+    response = await get_learning_content_service().mark_complete(content_id=content_id, user_id=user_id)
+    if response is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Lesson not found, or does not belong to this user.",
+            )
+    return response
