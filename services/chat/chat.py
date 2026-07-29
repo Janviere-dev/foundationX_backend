@@ -12,6 +12,7 @@ from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_remot
 from agents.tools.learning_agent_tools import search_web_articles, search_web_videos
 
 from agents.prompts.chat_prompt import instruction as chat_instruction
+from agents.prompts.personalization import format_first_name, format_goals
 
 from agents.schemas.chat_schema import (
     ChatRequest,
@@ -49,16 +50,19 @@ class ChatManagement:
             )
         self.chat_repository = ChatRepository()
 
-    async def send_message(self, request: ChatRequest) -> ChatResponse:
+    async def send_message(self, request: ChatRequest, student: dict) -> ChatResponse:
         """
         Send one chat turn. If session_id is omitted, starts a new session;
         otherwise continues an existing one, using its prior turns/summary
         as conversation context.
         """
+        user_id = student["user_id"]
+        grade = student["grade"]
+
         session = None
         if request.session_id:
             session = await self.chat_repository.get_session(request.session_id)
-            if session is None or session.get("user_id") != request.user_id:
+            if session is None or session.get("user_id") != user_id:
                 raise ValueError(f"No chat session found for session_id={request.session_id}")
 
         session_id = request.session_id or str(uuid4())
@@ -68,14 +72,18 @@ class ChatManagement:
 
         retrieval = await self.retriever.retrieve_chat_content(
             query=request.question,
-            grade=request.grade,
+            grade=grade,
             top_int=get_settings().TOP_K,
             )
         documents = retrieval["documents"]
         source_chunks = [document_to_source_chunk(document) for document in documents]
 
         instruction = build_chat_instruction(
-            instruction=chat_instruction.format(grade=request.grade),
+            instruction=chat_instruction.format(
+                grade=grade,
+                first_name=format_first_name(student.get("first_name")),
+                goals=format_goals(student.get("goals")),
+                ),
             chunk_context=build_context(source_chunks),
             summary=previous_summary,
             history_block=build_history_block(previous_messages[-RECENT_TURNS:]),
@@ -84,7 +92,7 @@ class ChatManagement:
         final_text, captured = await run_chat_agent(
             instruction=instruction,
             question=request.question,
-            user_id=request.user_id,
+            user_id=user_id,
             tools=chat_agent_tools,
             )
 
@@ -104,17 +112,17 @@ class ChatManagement:
         summary = previous_summary
         if turn % SUMMARY_EVERY_N_TURNS == 0:
             summary = await run_summary_agent(
-                grade=request.grade,
+                grade=grade,
                 messages=previous_messages + [turn_record],
-                user_id=request.user_id,
+                user_id=user_id,
                 )
 
         if session is None:
             await self.chat_repository.create_session(
                 session_id=session_id,
                 document={
-                    "user_id": request.user_id,
-                    "grade": request.grade,
+                    "user_id": user_id,
+                    "grade": grade,
                     "messages": [turn_record],
                     "turn_count": turn,
                     "summary": summary,
@@ -132,7 +140,7 @@ class ChatManagement:
                 )
 
         return ChatResponse(
-            user_id=request.user_id,
+            user_id=user_id,
             session_id=session_id,
             question=request.question,
             ai_response=final_text,
