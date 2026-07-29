@@ -9,9 +9,7 @@ class ChatRequest(BaseModel):
     """
     Chat with AI
     """
-    user_id:str = Field(description="User ID")
     session_id:Optional[str] = Field(description="Session Id - omit to start a new chat session", default=None)
-    grade:str = Field(description="Student current grade eg.Senior 6")
     question:str = Field(description="User question")
 
 class ChatResponse(BaseModel):
