@@ -12,6 +12,7 @@ from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_remot
 
 from agents.prompts.quiz_generator_prompt import quiz_question_instruction, quiz_question_prompt
 from agents.prompts.quizz_grader_prompt import quiz_grader_instruction, quiz_grader_prompt
+from agents.prompts.personalization import format_first_name, format_goals
 from agents.schemas.learning_schema import QuestionDetail
 from agents.schemas.quiz_generator_schema import (
     QuizzQuestionRequest,
@@ -25,6 +26,7 @@ from agents.schemas.quizz_assessor_schema import (
     QuizzAssessmentReport,
     QuizzAssessmentPayload,
     QuizzSubmissionAck,
+    QuizProgressSummary,
     UserResponse,
     )
 from db.repositories.quiz_repository import QuizSessionRepository
@@ -65,14 +67,14 @@ class Assessment:
         self.quiz_repository = QuizSessionRepository()
         self.quiz_report_repository = QuizReportRepository()
 
-    async def generate_questions(self, quizz_request:QuizzQuestionRequest) -> QuizzQuestionResponse:
+    async def generate_questions(self, quizz_request:QuizzQuestionRequest, student:dict) -> QuizzQuestionResponse:
         """
         This function generates quizz question. A student must finish
         their current quiz before starting a new one - unless the current
         one has expired out of Redis without being finished, in which case
         it's marked abandoned and a new quiz is allowed.
         """
-        pending_session = await self.quiz_repository.find_incomplete_session(quizz_request.user_id)
+        pending_session = await self.quiz_repository.find_incomplete_session(student["user_id"])
         if pending_session is not None:
             pending_quizz_id = pending_session["_id"]
             cached_json = await get_cached_quizz(pending_quizz_id)
@@ -85,7 +87,7 @@ class Assessment:
 
         retrieval = await self.retriever.retrieve_learning_content(
             query=quizz_request.learning_query,
-            grade=quizz_request.grade,
+            grade=student["grade"],
             subject=quizz_request.subject,
             top_int=get_settings().TOP_K,
             )
@@ -93,11 +95,13 @@ class Assessment:
         source_chunks = [document_to_source_chunk(document) for document in retrieval["documents"]]
 
         instruction = quiz_question_instruction.format(
-            grade=quizz_request.grade,
+            grade=student["grade"],
             subject=quizz_request.subject,
             learning_query=quizz_request.learning_query,
             number_questions=quizz_request.number_question,
             difficulty_instruction=build_difficulty_instruction(quizz_request.quizz_level),
+            first_name=format_first_name(student.get("first_name")),
+            goals=format_goals(student.get("goals")),
             )
         instruction = with_context(instruction, build_context(source_chunks))
 
@@ -105,16 +109,16 @@ class Assessment:
             instruction=instruction,
             prompt=quiz_question_prompt,
             agent_builder="quiz_llm",
-            user_id=quizz_request.user_id,
+            user_id=student["user_id"],
             agent_name="quiz_generator_llm",
             )
 
         payload = QuizzQuestionPayload.model_validate_json(result)
 
         response = QuizzQuestionResponse(
-            user_id=quizz_request.user_id,
+            user_id=student["user_id"],
             quizz_id=quizz_id,
-            grade=quizz_request.grade,
+            grade=student["grade"],
             learning_query=quizz_request.learning_query,
             subject=quizz_request.subject,
             number_questions=len(payload.question_details),
@@ -125,22 +129,30 @@ class Assessment:
             created_at=datetime.now(timezone.utc).isoformat(),
             )
 
+        # student_first_name/student_goals ride along in the Mongo document
+        # only (not the public response schema) so grade_quiz - which only
+        # gets quizz_id, as a background task - can rebuild personalized
+        # grading context later without re-fetching the profile.
+        session_document = response.model_dump(mode="json")
+        session_document["student_first_name"] = student.get("first_name")
+        session_document["student_goals"] = student.get("goals")
+
         await self.quiz_repository.create_session(
             quizz_id=quizz_id,
-            document=response.model_dump(mode="json"),
+            document=session_document,
             )
         await save_generated_quizz(quizz_id=quizz_id, document_json=response.model_dump_json())
 
         return response
 
-    async def submit_answers(self, assessment_request:QuizzAssessmentRequest) -> QuizzSubmissionAck:
+    async def submit_answers(self, assessment_request:QuizzAssessmentRequest, user_id:str) -> QuizzSubmissionAck:
         """
         Store the student's submitted answers and mark the quiz completed -
         this is the point where the student is done with it, regardless of
         whether grading (a separate background step) succeeds afterward.
         """
         session = await self.quiz_repository.get_session(assessment_request.quizz_id)
-        if session is None:
+        if session is None or session.get("user_id") != user_id:
             raise ValueError(f"No quiz found for quizz_id={assessment_request.quizz_id}")
 
         await self.quiz_repository.save_responses(
@@ -174,7 +186,12 @@ class Assessment:
             resources = build_resources(source_chunks)
 
             context = f"{build_context(source_chunks)}\n\nQuiz results:\n{build_quiz_results_summary(question_feedback)}"
-            instruction = quiz_grader_instruction.format(grade=session["grade"], subject=session["subject"])
+            instruction = quiz_grader_instruction.format(
+                grade=session["grade"],
+                subject=session["subject"],
+                first_name=format_first_name(session.get("student_first_name")),
+                goals=format_goals(session.get("student_goals")),
+                )
             instruction = with_context(instruction, context)
 
             result = await run_agent(
@@ -221,6 +238,17 @@ class Assessment:
         if report is None:
             return None
         return QuizzAssessmentReport.model_validate(report)
+
+    async def get_quiz_progress(self, user_id:str) -> QuizProgressSummary:
+        started = await self.quiz_repository.count({"user_id": user_id})
+        completed = await self.quiz_repository.count({"user_id": user_id, "status": QuizzStatus.Completed.value})
+        reports = await self.quiz_report_repository.list_reports_for_user(user_id)
+        return QuizProgressSummary(
+            started=started,
+            completed=completed,
+            reports_generated=len(reports),
+            reports=[QuizzAssessmentReport.model_validate(report) for report in reports],
+            )
 
 
 @lru_cache
