@@ -3,10 +3,11 @@
 import logging
 
 import openai
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
 from fastapi.routing import APIRouter
-from agents.schemas.learning_schema import GenerateLearningContentRequest, GenerateLearningResponse
+from agents.schemas.learning_schema import GenerateLearningContentRequest, GenerateLearningResponse, LessonProgressSummary
 from services.learning_service.content import get_learning_content_service
+from db.firebase.auth import authentication
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,11 @@ async def test_router():
 
 @router.post("/", response_model=GenerateLearningResponse)
 async def generate_lesson(
-    generate_request:GenerateLearningContentRequest
+    generate_request:GenerateLearningContentRequest,
+    student:dict = Depends(authentication().get_student_context),
 ):
     try:
-        return await get_learning_content_service().get_content(request=generate_request)
+        return await get_learning_content_service().get_content(request=generate_request, student=student)
     except openai.APIError:
         raise HTTPException(
             status_code=503,
@@ -39,12 +41,16 @@ async def generate_lesson(
             detail="Learning agent not available.",
             )
 
+@router.get("/progress", response_model=LessonProgressSummary)
+async def get_lesson_progress(student:dict = Depends(authentication().get_student_context)):
+    return await get_learning_content_service().get_lesson_progress(user_id=student["user_id"])
+
 @router.get("/{content_id}", response_model=GenerateLearningResponse)
 async def get_lesson(
     content_id:str,
-    user_id:str,
+    student:dict = Depends(authentication().get_student_context),
     ) -> GenerateLearningResponse:
-    response = await get_learning_content_service().get_saved_content(content_id=content_id, user_id=user_id)
+    response = await get_learning_content_service().get_saved_content(content_id=content_id, user_id=student["user_id"])
     if response is None:
         raise HTTPException(
             status_code=404,
@@ -55,9 +61,9 @@ async def get_lesson(
 @router.patch("/{content_id}/complete", response_model=GenerateLearningResponse)
 async def complete_lesson(
     content_id:str,
-    user_id:str,
+    student:dict = Depends(authentication().get_student_context),
     ) -> GenerateLearningResponse:
-    response = await get_learning_content_service().mark_complete(content_id=content_id, user_id=user_id)
+    response = await get_learning_content_service().mark_complete(content_id=content_id, user_id=student["user_id"])
     if response is None:
         raise HTTPException(
             status_code=404,
