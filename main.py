@@ -7,6 +7,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from core.routers import routers
+from middleware.cors_middleware import cors_middleware
+
 from db.mongodb import connect_to_mongo, close_mongo_connection
 from db.redis.setup import connect_to_redis, close_redis_connection
 from db.firebase.setup import init_firebase
@@ -40,4 +42,5 @@ app = FastAPI(
     lifespan=lifespan,
     )
 
+cors_middleware(app=app)
 routers(app=app)
