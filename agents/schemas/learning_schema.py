@@ -5,10 +5,13 @@ from pydantic import BaseModel, Field, field_validator, AnyHttpUrl
 
 class GenerateLearningContentRequest(BaseModel):
     """Base class for generating learning content"""
-    user_id:str = Field(description="User requesting the learning content")
     learning_query:str = Field(description="Question to send to the learning agent")
-    grade:str = Field(description="Student current grade eg.Senior 6")
     subject:str = Field(description="Subject the student need to learn eg.Calculus/Quadratic Equations")
+
+class LessonProgressSummary(BaseModel):
+    started:int
+    completed:int
+    in_progress:int
 
 class QuestionDetail(BaseModel):
     text:str = Field(description="The checkpoint question text")
