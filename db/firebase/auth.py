@@ -1,7 +1,14 @@
+import json
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from firebase_admin import auth
 from db.repositories.base import BaseRepository
+from db.redis.cache_student_profile import (
+    cache_student_profile,
+    get_cached_student_profile,
+    invalidate_cached_student_profile,
+    )
 from schemas.user_schema import UpdateInformation
 from datetime import date
 
@@ -60,6 +67,7 @@ class Auth:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to update user info"
             )
+        await invalidate_cached_student_profile(student_id)
         return {
             "status":True,
             "message":"Update OK",
@@ -68,6 +76,43 @@ class Auth:
                 "updated_info":update_info
             }
         }
+
+    async def check_user_exist_verify(self, user_id:str):
+        cached_profile = await get_cached_student_profile(user_id)
+        if cached_profile is not None:
+            check_user = json.loads(cached_profile)
+        else:
+            check_user = await self.__db.find_by_id(doc_id=user_id)
+            if not check_user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found.Complete registration"
+
+                )
+            await cache_student_profile(user_id=user_id, profile_json=json.dumps(check_user, default=str))
+
+        if not check_user.get("email_verified") or not check_user.get("onboarding_complete"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Please complete your onboarding and ensure your email is verified"
+            )
+        return [str(check_user.get("user_id")),
+                check_user.get("first_name"),
+                check_user.get("grade"), check_user.get("goals")
+                ]
+
+    async def get_student_context(
+            self,
+            credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+            ) -> dict:
+        decoded_token = await self.verify_credentials(credentials=credentials)
+        user_id, first_name, grade, goals = await self.check_user_exist_verify(user_id=decoded_token["uid"])
+        return {
+            "user_id": user_id,
+            "first_name": first_name,
+            "grade": grade,
+            "goals": goals,
+            }
 
 @lru_cache
 def authentication():
