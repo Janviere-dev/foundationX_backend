@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import List
+from typing import List, Optional
 
-class NewUser(BaseModel):
+class UpdateInformation(BaseModel):
     """
     New User information during signup from Firebase/FireAuth
     """
-    user_id:str
-    email_address:EmailStr
-    created_at:datetime
+    first_name:str = Field(description="User first name")
+    last_name:str = Field(description="User last name")
+    school:str = Field(description="Student school")
+    grade:str = Field(description="Student grade")
+    subjects:List[str] = Field(description="Student subjects")
+    goals:List[str] = Field(description="Student choosen goals")
+    date_of_birth:Optional[date] = Field(description="Student date of birth")
+    updated_at:datetime = Field(description="Date and time user updated profile information")
+    onboarding_complete:bool = Field(description="Onboarding status", default=True)

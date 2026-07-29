@@ -2,6 +2,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from firebase_admin import auth
 from db.repositories.base import BaseRepository
+from schemas.user_schema import UpdateInformation
+from datetime import date
 
 from functools import lru_cache
 
@@ -42,6 +44,29 @@ class Auth:
             "status":True,
             "message":"User saved successfully",
             "data":user_credentials
+        }
+
+    async def update_user_information(self, update_info:UpdateInformation, student_id:str):
+        """
+        This function update user information
+        """
+        student_info = update_info.model_dump(mode="json")
+
+        try:
+            update_student = await self.__db.update_one(doc_id=student_id, update=student_info)
+        except Exception as error:
+            print(error)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to update user info"
+            )
+        return {
+            "status":True,
+            "message":"Update OK",
+            "data":{
+                "user_id":student_id,
+                "updated_info":update_info
+            }
         }
 
 @lru_cache
