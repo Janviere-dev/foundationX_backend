@@ -25,6 +25,12 @@ async def create_user(user:dict = Depends(authentication().verify_credentials)):
     user_credential["time_added"] = datetime.now(ZoneInfo("Africa/Kigali"))
     return await authentication().create_new_user(user_credentials=user_credential)
 
+@router.get("/me")
+async def get_my_profile(user:dict = Depends(authentication().verify_credentials)):
+    profile = await authentication().get_my_profile(user_id=user["uid"])
+    profile["_id"] = str(profile["_id"])
+    return profile
+
 @router.put("/extend_info")
 async def extend_user_info(
     update_info:UpdateInformation,
@@ -33,5 +39,6 @@ async def extend_user_info(
     user_id = authorization["uid"]
     return await authentication().update_user_information(
         update_info=update_info,
-        student_id=user_id
+        student_id=user_id,
+        email_verified=authorization.get("email_verified", False),
         )

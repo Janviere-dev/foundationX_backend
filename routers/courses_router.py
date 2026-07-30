@@ -3,11 +3,10 @@
 import logging
 from typing import List, Dict, Any
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from fastapi.routing import APIRouter
 
 from services.courses.load_courses import get_courses_service
-from db.firebase.auth import authentication
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,7 @@ router = APIRouter(
     )
 
 @router.get("/", response_model=List[Dict[str, Any]])
-async def get_courses(credentials:dict = Depends(authentication().verify_credentials)):
+async def get_courses():
     try:
         return await get_courses_service().display_available_courses()
     except Exception:
