@@ -85,6 +85,11 @@ class Settings(BaseSettings):
     REDIS_MAX_RETRIES:int = 3
     QUIZ_ABANDON_TIMEOUT_SECONDS:int = 1800
     LEARNING_CONTENT_EXPIRE_MINUTES:int = 10080
+    STUDENT_PROFILE_CACHE_MINUTES:int = 3600
+
+    # Firebase
+    PATH_TO_FIREBASE:str
+    FIREBASE_WEB_API_KEY:str
 
     @field_validator("EMBED_LIMIT", "OCR_LIMIT", "OCR_FILES", mode="before")
     @classmethod

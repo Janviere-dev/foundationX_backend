@@ -13,6 +13,7 @@ from core.config import get_settings
 async def submit_learning_response(
         learning_plan: List[str],
         learning_content: str,
+        key_points: List[str],
         checkpoints_questions_response: List[Checkpoint_question],
         tool_context: ToolContext,
 ) -> dict:
@@ -23,6 +24,7 @@ async def submit_learning_response(
     Args:
         learning_plan: Step by step lesson plan
         learning_content: The full lesson content
+        key_points: Small summary of the lesson in bullet points
         checkpoints_questions_response: Checkpoint questions for the lesson
     """
     # Flat top-level parameters instead of one nested "response" object -
@@ -33,6 +35,7 @@ async def submit_learning_response(
     payload = LearningResponsePayload(
         learning_plan=learning_plan,
         learning_content=learning_content,
+        key_points=key_points,
         checkpoints_questions_response=checkpoints_questions_response,
         )
 
@@ -44,8 +47,8 @@ async def search_web_articles(
         ) -> dict:
     """
     This tool searches the web for articles and further reading on a topic.
-    Use this tool whenever you need to supplement the chunks with further information
-    and when you suggest user sources for funding reading on the topic
+    You may use this tool whenever you need to supplement the chunks with further information
+    and when the user specifically ask for further ressources. Select only two best article/book that explains the topic
     Args:
         query: the topic to search for
     """
@@ -71,8 +74,8 @@ async def search_web_videos(
         ) -> dict:
     """
     This tool searches the web for videos and further tutorials.
-    Use this tool whenever you need to supplement the chunks with further information
-    and when you suggest user sources for funding reading on the topic
+    You may use this tool whenever you need to supplement the chunks with further information
+    and when the user request for further ressources. Select only one best video tutorial
     Args:
         query: The topic to search for videos about.
     """

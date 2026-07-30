@@ -12,7 +12,6 @@ class QuizzAssessmentRequest(BaseModel):
     """
     Request to submit answers for a completed quiz.
     """
-    user_id:str = Field(description="User ID")
     quizz_id:str = Field(description="ID of the quizz returned when the questions were generated")
     responses:List[UserResponse] = Field(description="Student's answer for each question")
 
@@ -78,3 +77,9 @@ class QuizzAssessmentReport(BaseModel):
     current_understanding_level:str = Field(description="Narrative summary of the student's grasp of the topic")
     next_steps:List[str] = Field(description="What the student should focus on next")
     resources:List[ResourceReference] = Field(default_factory=list)
+
+class QuizProgressSummary(BaseModel):
+    started:int
+    completed:int
+    reports_generated:int
+    reports:List[QuizzAssessmentReport] = Field(default_factory=list)

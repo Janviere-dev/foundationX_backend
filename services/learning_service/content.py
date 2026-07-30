@@ -7,14 +7,17 @@ from typing import Optional
 
 from core.config import get_settings
 from agents.prompts.learning_prompt import learning_instruction, learning_prompt
+from agents.prompts.personalization import format_first_name, format_goals
 from agents.rag_pipeline.retrieval.retriever import Retrieval
 from agents.rag_pipeline.retrieval.init_sentence_transformamer import init_remote_embedder, init_qdrant_retriever
 from agents.schemas.learning_schema import (
     GenerateLearningContentRequest,
     GenerateLearningResponse,
     LearningResponsePayload,
+    LessonProgressSummary,
     )
 from db.repositories.learning_content_repository import LearningContentRepository
+from db.repositories.progress_repository import ProgressRepository
 from db.redis.save_generated_learning_content import (
     cache_learning_content,
     get_cached_learning_content,
@@ -33,27 +36,30 @@ class LearningContent:
             retriver=init_qdrant_retriever(),
             )
         self.content_repository = LearningContentRepository()
+        self.progress_repository = ProgressRepository()
 
-    async def get_content(self, request: GenerateLearningContentRequest) -> GenerateLearningResponse:
+    async def get_content(self, request: GenerateLearningContentRequest, student: dict) -> GenerateLearningResponse:
         retrieved = await self.retriever.retrieve_learning_content(
             query=request.learning_query,
-            grade=request.grade,
+            grade=student["grade"],
             subject=request.subject,
             top_int=get_settings().TOP_K,
             )
         documents = retrieved["documents"]
 
         instruction = learning_instruction.format(
-            grade=request.grade,
+            grade=student["grade"],
             subject=request.subject,
             learning_query=request.learning_query,
+            first_name=format_first_name(student.get("first_name")),
+            goals=format_goals(student.get("goals")),
             )
         instruction = with_context(instruction, build_context(documents))
 
         result = await run_agent(
             instruction=instruction,
             prompt=learning_prompt,
-            user_id=str(uuid.uuid4()),
+            user_id=student["user_id"],
             agent_name="learning_llm",
             )
 
@@ -61,11 +67,12 @@ class LearningContent:
 
         response = GenerateLearningResponse(
             content_id=str(uuid.uuid4()),
-            user_id=request.user_id,
+            user_id=student["user_id"],
             subject=request.subject,
-            grade=request.grade,
+            grade=student["grade"],
             learning_plan=payload.learning_plan,
             learning_content=payload.learning_content,
+            key_points=payload.key_points,
             checkpoints_questions_response=payload.checkpoints_questions_response,
             rag_enabled=bool(documents),
             external_sources=None,
@@ -87,6 +94,12 @@ class LearningContent:
             document=response.model_dump(mode="json"),
             )
         await cache_learning_content(content_id=response.content_id, document_json=response.model_dump_json())
+        await self.progress_repository.start_lesson(
+            user_id=student["user_id"],
+            subject=request.subject,
+            topic=request.learning_query,
+            content_id=response.content_id,
+            )
 
         return response
 
@@ -118,12 +131,17 @@ class LearningContent:
             return None
 
         await self.content_repository.mark_complete(content_id=content_id)
+        await self.progress_repository.complete_lesson(content_id=content_id)
 
         response = GenerateLearningResponse.model_validate(document)
         response.is_complete = True
         await cache_learning_content(content_id=content_id, document_json=response.model_dump_json())
 
         return response
+
+    async def get_lesson_progress(self, user_id: str) -> LessonProgressSummary:
+        counts = await self.progress_repository.count_progress(user_id)
+        return LessonProgressSummary(**counts)
 
 
 @lru_cache

@@ -26,7 +26,14 @@ class LLMDefinition:
         self.instructions = instructions
         self.prompt = prompt
 
-    def llm_definition(self, agent_name:str, tools:list=[], output_schema=None, use_fallback:bool=False)->LlmAgent:
+    def llm_definition(
+            self,
+            agent_name:str,
+            tools:list=[],
+            output_schema=None,
+            use_fallback:bool=False,
+            function_calling_mode:FunctionCallingConfigMode=FunctionCallingConfigMode.ANY,
+            )->LlmAgent:
         settings = get_settings()
         if use_fallback:
             model = settings.LLM_MODEL_FALLBACK
@@ -55,7 +62,7 @@ class LLMDefinition:
                 top_k=40,
                 tool_config=ToolConfig(
                     function_calling_config=FunctionCallingConfig(
-                        mode=FunctionCallingConfigMode.ANY,
+                        mode=function_calling_mode,
                     )
                 ) if tools else None,
             ),
@@ -79,5 +86,22 @@ class LLMDefinition:
         return self.llm_definition(
             agent_name=agent_name,
             output_schema=QuizzAssessmentPayload,
+            use_fallback=use_fallback,
+        )
+
+    async def chat_response(self, agent_name:str = "chat_agent", use_fallback:bool=False, tools:list=[]) -> LlmAgent:
+        # AUTO (not ANY) - unlike the submit/quiz/grader agents, the chat
+        # agent shouldn't be forced to call a tool on every single turn
+        # (e.g. a plain "hi" shouldn't trigger a web search).
+        return self.llm_definition(
+            agent_name=agent_name,
+            use_fallback=use_fallback,
+            tools=tools,
+            function_calling_mode=FunctionCallingConfigMode.AUTO,
+        )
+
+    async def chat_summary_llm(self, agent_name:str = "chat_summary_agent", use_fallback:bool=False) -> LlmAgent:
+        return self.llm_definition(
+            agent_name=agent_name,
             use_fallback=use_fallback,
         )

@@ -39,3 +39,6 @@ sentence-transformers-haystack==0.1.1
 
 # background task
 celery==5.6.3
+
+# Firebase
+firebase-admin==7.5.0

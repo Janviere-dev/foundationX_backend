@@ -47,6 +47,25 @@ class Retrieval:
             filters=filters
             )
 
+    async def retrieve_chat_content(self, query:str, grade:str, top_int = 5):
+        """
+        This function retrieves chunks for the chat agent. Chat is
+        open-topic (the student doesn't pick a subject up front), so this
+        filters by grade only rather than reusing retrieve_learning_content's
+        subject+grade filter.
+        """
+        query_vector = (await self.__embedder.run(text=query))["embedding"]
+
+        filters = Filter(
+            must=[
+                FieldCondition(key="meta.grade", match=MatchText(text=grade)),
+                ]
+            )
+        return self.__retriever.run(
+            query_embedding=query_vector,
+            filters=filters
+            )
+
 def generate_content(prompt: str, context: str = "") -> str:
     full_prompt = f"Context:\n{context}\n\n{prompt}" if context else prompt
     generator = GoogleGenAIChatGenerator(model="gemini-2.5-flash", api_key=Secret.from_token(get_settings().GOOGLE_API_KEY))

@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3.2
+    image: traefik:v3
     restart: unless-stopped
     command:
       - "--providers.docker=true"
@@ -33,6 +33,10 @@ services:
       # Override the local-dev value from .env - inside the compose
       # network, Redis is reachable by its service name, not localhost.
       - REDIS_URL=redis://redis:6379/0
+    volumes:
+      # Mounted, not baked into the image (see .dockerignore) - this is a
+      # Firebase private key and shouldn't end up in a pushed image layer.
+      - "./foundationx_service_account.json:/app/foundationx_service_account.json:ro"
     depends_on:
       - redis
     networks:

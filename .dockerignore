@@ -1,4 +1,5 @@
 .env
+foundationx_service_account.json
 .git
 .gitignore
 venv/
@@ -10,3 +11,8 @@ server_logs/
 push_github.sh
 .pytest_cache/
 *.md
+test_firebase.sh
+planning.pdf
+start.sh
+FoundationX_Backend_Development_Plan_v2.docx
+    

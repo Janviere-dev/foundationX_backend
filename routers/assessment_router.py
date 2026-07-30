@@ -3,25 +3,29 @@
 import logging
 
 import openai
-from fastapi import BackgroundTasks, HTTPException
+from fastapi import BackgroundTasks, Depends, HTTPException
 from fastapi.routing import APIRouter
 from services.assessment.assessment import get_assessment_service, IncompleteQuizError
 from agents.schemas.quiz_generator_schema import QuizzQuestionRequest, QuizzQuestionResponse
-from agents.schemas.quizz_assessor_schema import QuizzAssessmentRequest, QuizzAssessmentReport, QuizzSubmissionAck
+from agents.schemas.quizz_assessor_schema import QuizzAssessmentRequest, QuizzAssessmentReport, QuizzSubmissionAck, QuizProgressSummary
+from db.firebase.auth import authentication
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/api/assessment"
+    prefix="/api/assessment",
+    tags=["Assessment Router"]
     )
 
 @router.post("/quizz", response_model=QuizzQuestionResponse)
 async def generate_quizz(
-    quizz_payload:QuizzQuestionRequest
+    quizz_payload:QuizzQuestionRequest,
+    student:dict = Depends(authentication().get_student_context),
     ) -> QuizzQuestionResponse:
     try:
         return await get_assessment_service().generate_questions(
-            quizz_request=quizz_payload
+            quizz_request=quizz_payload,
+            student=student,
             )
     except IncompleteQuizError as error:
         # the student already has an incomplete quiz pending - hand back
@@ -40,10 +44,11 @@ async def generate_quizz(
 async def submit_quizz_answers(
     assessment_payload:QuizzAssessmentRequest,
     background_tasks:BackgroundTasks,
+    student:dict = Depends(authentication().get_student_context),
     ) -> QuizzSubmissionAck:
     service = get_assessment_service()
     try:
-        ack = await service.submit_answers(assessment_request=assessment_payload)
+        ack = await service.submit_answers(assessment_request=assessment_payload, user_id=student["user_id"])
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error))
     except Exception:
@@ -53,12 +58,16 @@ async def submit_quizz_answers(
     background_tasks.add_task(service.grade_quiz, quizz_id=assessment_payload.quizz_id)
     return ack
 
+@router.get("/quizz/progress", response_model=QuizProgressSummary)
+async def get_quizz_progress(student:dict = Depends(authentication().get_student_context)) -> QuizProgressSummary:
+    return await get_assessment_service().get_quiz_progress(user_id=student["user_id"])
+
 @router.get("/quizz/report/{quizz_id}", response_model=QuizzAssessmentReport)
 async def get_quizz_report(
     quizz_id:str,
-    user_id:str,
+    student:dict = Depends(authentication().get_student_context),
     ) -> QuizzAssessmentReport:
-    report = await get_assessment_service().get_report(quizz_id=quizz_id, user_id=user_id)
+    report = await get_assessment_service().get_report(quizz_id=quizz_id, user_id=student["user_id"])
     if report is None:
         raise HTTPException(
             status_code=404,
