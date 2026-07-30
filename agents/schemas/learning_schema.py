@@ -65,6 +65,7 @@ class GenerateLearningResponse(BaseModel):
     grade:str = Field(description="Student current grade")
     learning_plan:List[str] = Field(description="Steps by steps Lesson plan")
     learning_content:str = Field(description="Lesson content")
+    key_points:List[str] = Field(description="Small summary of the lessons in bullet points")
     checkpoints_questions_response:List[Checkpoint_question] = Field(description="Checkpoint questions")
     rag_enabled:bool = Field(description="True if chunks retrieved and False if not")
     retrival_details:List[RetreivedChunks]
@@ -82,4 +83,5 @@ class LearningResponsePayload(BaseModel):
     """
     learning_plan:List[str] = Field(description="Steps by steps Lesson plan")
     learning_content:str = Field(description="Lesson content")
+    key_points:List[str] = Field(description="Small summary of the lessons in bullet points")
     checkpoints_questions_response:List[Checkpoint_question] = Field(description="Checkpoint questions")

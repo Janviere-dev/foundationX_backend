@@ -72,6 +72,7 @@ class LearningContent:
             grade=student["grade"],
             learning_plan=payload.learning_plan,
             learning_content=payload.learning_content,
+            key_points=payload.key_points,
             checkpoints_questions_response=payload.checkpoints_questions_response,
             rag_enabled=bool(documents),
             external_sources=None,

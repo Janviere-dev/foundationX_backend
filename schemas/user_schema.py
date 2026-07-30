@@ -18,3 +18,6 @@ class UpdateInformation(BaseModel):
     date_of_birth:Optional[date] = Field(description="Student date of birth")
     updated_at:datetime = Field(description="Date and time user updated profile information")
     onboarding_complete:bool = Field(description="Onboarding status", default=True)
+
+class AddSubjectRequest(BaseModel):
+    subject:str = Field(description="Subject to add to the student's subject list")

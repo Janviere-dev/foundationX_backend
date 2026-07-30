@@ -6,7 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from db.firebase.auth import authentication
-from schemas.user_schema import UpdateInformation
+from schemas.user_schema import UpdateInformation, AddSubjectRequest
 
 router = APIRouter(
     prefix="/api/users",
@@ -42,3 +42,10 @@ async def extend_user_info(
         student_id=user_id,
         email_verified=authorization.get("email_verified", False),
         )
+
+@router.patch("/subjects")
+async def add_subject(
+    payload:AddSubjectRequest,
+    authorization:dict = Depends(authentication().verify_credentials),
+    ):
+    return await authentication().add_subject(student_id=authorization["uid"], subject=payload.subject)

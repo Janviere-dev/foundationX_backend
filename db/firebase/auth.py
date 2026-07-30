@@ -76,6 +76,15 @@ class Auth:
             }
         }
 
+    async def add_subject(self, student_id:str, subject:str) -> dict:
+        await self.__db.collection.update_one(
+            {"_id": self.__db._to_id(doc_id=student_id)},
+            {"$addToSet": {"subjects": subject}},
+            )
+        await invalidate_cached_student_profile(student_id)
+        profile = await self._fetch_profile(student_id)
+        return {"status":True, "message":"Subject added", "data":profile}
+
     async def _fetch_profile(self, user_id:str):
         cached_profile = await get_cached_student_profile(user_id)
         if cached_profile is not None:

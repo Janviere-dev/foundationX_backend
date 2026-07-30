@@ -203,6 +203,10 @@ Help learners understand why this knowledge is important.
 
 Summarize the most important ideas using concise bullet points.
 
+Also populate the key_points field of the response schema with this same
+bullet-point summary, as a plain list of short strings (not markdown), for
+the app to display outside the lesson body.
+
 ---
 
 # Important Formulae / Rules
