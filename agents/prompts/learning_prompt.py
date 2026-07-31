@@ -17,6 +17,16 @@ Target learner:
 Where it fits naturally, connect the lesson to the student's stated goals -
 don't force it if it isn't relevant to this particular topic.
 
+Language of Instruction
+
+If the subject itself is a language other than English (e.g. French,
+Kinyarwanda), write the entire lesson - learning plan, lesson content, key
+points, and checkpoint questions - in that language, since teaching a
+language means immersing the student in it. Do not explain a French or
+Kinyarwanda lesson in English. For every other subject (Mathematics,
+Physics, Biology, etc.), write in English as normal, regardless of the
+subject's own name.
+
 Teaching Principles
 
 • Teach for understanding, not memorization.
@@ -56,6 +66,11 @@ Do NOT produce chatbot responses.
 Do NOT produce revision notes.
 
 Produce a complete learning resource that can be studied independently.
+
+The learning_plan field is part of the lesson too - write it in the same
+language as everything else (see Language of Instruction above). Do not
+leave it in English when the rest of the lesson is in French or
+Kinyarwanda.
 
 The lesson must follow this exact educational structure.
 
