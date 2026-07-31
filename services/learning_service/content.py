@@ -21,6 +21,8 @@ from db.repositories.progress_repository import ProgressRepository
 from db.redis.save_generated_learning_content import (
     cache_learning_content,
     get_cached_learning_content,
+    cache_content_lookup,
+    get_cached_content_id,
     )
 from services.learning_service.helper_learning_service import (
     build_context,
@@ -39,6 +41,17 @@ class LearningContent:
         self.progress_repository = ProgressRepository()
 
     async def get_content(self, request: GenerateLearningContentRequest, student: dict) -> GenerateLearningResponse:
+        existing_content_id = await get_cached_content_id(
+            user_id=student["user_id"],
+            subject=request.subject,
+            learning_query=request.learning_query,
+            grade=student["grade"],
+            )
+        if existing_content_id:
+            existing = await self.get_saved_content(content_id=existing_content_id, user_id=student["user_id"])
+            if existing:
+                return existing
+
         retrieved = await self.retriever.retrieve_learning_content(
             query=request.learning_query,
             grade=student["grade"],
@@ -94,6 +107,13 @@ class LearningContent:
             document=response.model_dump(mode="json"),
             )
         await cache_learning_content(content_id=response.content_id, document_json=response.model_dump_json())
+        await cache_content_lookup(
+            user_id=student["user_id"],
+            subject=request.subject,
+            learning_query=request.learning_query,
+            grade=student["grade"],
+            content_id=response.content_id,
+            )
         await self.progress_repository.start_lesson(
             user_id=student["user_id"],
             subject=request.subject,

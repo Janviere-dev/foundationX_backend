@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import hashlib
 import logging
 from typing import Optional
 
@@ -9,10 +10,16 @@ from db.redis.setup import get_redis
 logger = logging.getLogger(__name__)
 
 _KEY_PREFIX = "learning_content:"
+_LOOKUP_PREFIX = "learning_content_lookup:"
 
 
 def _key(content_id: str) -> str:
     return f"{_KEY_PREFIX}{content_id}"
+
+
+def _lookup_key(user_id: str, subject: str, learning_query: str, grade: str) -> str:
+    raw = f"{user_id}:{subject}:{learning_query}:{grade}".lower()
+    return f"{_LOOKUP_PREFIX}{hashlib.sha256(raw.encode()).hexdigest()}"
 
 
 async def cache_learning_content(content_id: str, document_json: str) -> None:
@@ -38,6 +45,21 @@ async def get_cached_learning_content(content_id: str) -> Optional[str]:
     if client is None:
         return None
     return await client.get(_key(content_id))
+
+
+async def cache_content_lookup(user_id: str, subject: str, learning_query: str, grade: str, content_id: str) -> None:
+    client = get_redis()
+    if client is None:
+        return
+    ttl_seconds = get_settings().LEARNING_CONTENT_EXPIRE_MINUTES * 60
+    await client.set(_lookup_key(user_id, subject, learning_query, grade), content_id, ex=ttl_seconds)
+
+
+async def get_cached_content_id(user_id: str, subject: str, learning_query: str, grade: str) -> Optional[str]:
+    client = get_redis()
+    if client is None:
+        return None
+    return await client.get(_lookup_key(user_id, subject, learning_query, grade))
 
 
 async def invalidate_cached_learning_content(content_id: str) -> None:
