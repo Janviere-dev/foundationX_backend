@@ -4,12 +4,22 @@ FastAPI backend for **FoundationX**, an AI-assisted learning platform for second
 
 ## Overview
 
-- **Auth**: Firebase Authentication only (Google / email sign-in on the client). This backend never touches Firestore — it verifies Firebase ID tokens and owns all app data itself in MongoDB.
+- **Auth**: Firebase Authentication only (Google / email sign-in on the client). This backend never touches Firestore  it verifies Firebase ID tokens and owns all app data itself in MongoDB.
 - **Content grounding**: curriculum PDFs (REB textbooks, past papers, and a few supplementary books) are OCR'd, chunked, embedded, and stored in Qdrant. Every lesson, quiz, and chat answer is generated with those chunks as retrieved context, not from the model's unaided knowledge.
 - **Agents**: four purpose-built LLM agents (learning content generator, quiz generator, quiz grader, chat assistant) run via Google's Agent Development Kit (ADK) on top of Gemini 2.5 Flash (via OpenRouter, with a direct-Gemini fallback).
 - **Personalization**: every agent call is grounded with the student's real profile (name, grade, goals) pulled from their verified account, not client-supplied values.
 
 See [`designs/`](designs/) for architecture diagrams: component diagram, deployment diagram, MongoDB ERD, API architecture, and the agents' request/response sequence.
+
+## Features
+
+- **Lesson generation**: retrieves relevant textbook passages for a subject/grade/topic and generates a structured lesson with checkpoint questions.
+- **Quiz generation & grading**: generates quizzes, accepts submissions, and grades them asynchronously in the background.
+- **Chat tutor**: RAG and web-search-grounded conversational agent with persisted, resumable chat sessions.
+- **Course catalogue**: browse available subjects/courses, backed by Qdrant facets and MongoDB.
+- **User accounts & progress**: Firebase-authenticated user profiles, per-subject enrollment, lesson/quiz progress tracking.
+- **Retrieval-Augmented Generation (RAG)**: textbooks are OCR'd, chunked, embedded, and stored in a vector database for semantic search.
+- **Persistence**: generated lessons, quiz sessions, quiz reports, chat sessions, and student progress are stored in MongoDB and cached in Redis for fast repeat reads.
 
 ## Tech Stack
 
@@ -97,7 +107,7 @@ source venv/bin/activate
 python -m pytest tests/
 ```
 
-Use `python -m pytest`, not a bare `pytest` — if you also have a conda environment active, a bare `pytest` can resolve to conda's copy instead of this project's venv. Tests use `mongomock` and mocked services/agents, so no live MongoDB, Qdrant, or LLM credentials are needed to run them.
+Use `python -m pytest`, not a bare `pytest`  if you also have a conda environment active, a bare `pytest` can resolve to conda's copy instead of this project's venv. Tests use `mongomock` and mocked services/agents, so no live MongoDB, Qdrant, or LLM credentials are needed to run them.
 
 ## API Surface
 
@@ -115,12 +125,12 @@ Full request/response shapes are in Swagger UI (`/docs`) once the server is runn
 
 ## Key Design Notes
 
-- **Trust boundary**: `user_id` and `grade` are never taken from the request body — every protected route derives them from the verified Firebase token plus the student's stored MongoDB profile (`get_student_context` dependency in `db/firebase/auth.py`). A client can't claim to be another user or a different grade than what's on file.
+- **Trust boundary**: `user_id` and `grade` are never taken from the request body  every protected route derives them from the verified Firebase token plus the student's stored MongoDB profile (`get_student_context` dependency in `db/firebase/auth.py`). A client can't claim to be another user or a different grade than what's on file.
 - **RAG grounding**: lesson/quiz generation retrieves REB curriculum chunks from Qdrant (filtered by subject + grade) before calling the LLM, and the prompt requires the model to treat retrieved content as the primary source of truth.
 - **Non-English subjects**: for language subjects (French, Kinyarwanda), the learning agent is instructed to teach *in* that language, not explain it in English.
 - **Caching strategy**: Redis is used for (a) read-through caches for lessons/quizzes (Mongo is always the source of truth), (b) a request-lookup cache so generating a lesson twice for the same student+subject+topic+grade reuses the existing one instead of re-calling the LLM, and (c) the student profile itself, since it's read on every authenticated request.
 - **Quiz concurrency rule**: a student can only have one *unfinished* quiz per lesson (subject + topic) at a time — scoped per lesson, not globally, so an unfinished quiz on one topic doesn't block starting a quiz on another.
-- **Chat is general-purpose**: unlike lessons/quizzes, chat isn't scoped to a single subject — it's a ChatGPT-style assistant that can be asked about anything, grounded by grade-filtered retrieval plus optional web search (Tavily) when the assistant judges it's needed.
+- **Chat is general-purpose**: unlike lessons/quizzes, chat isn't scoped to a single subject  it's a ChatGPT-style assistant that can be asked about anything, grounded by grade-filtered retrieval plus optional web search (Tavily) when the assistant judges it's needed.
 - **Background grading**: quiz submission returns immediately (`202`); grading runs as a FastAPI background task and the client polls the report endpoint until it's ready.
 
 ## Deployment
