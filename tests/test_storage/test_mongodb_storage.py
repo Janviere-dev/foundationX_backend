@@ -94,7 +94,7 @@ class MongoStorageTests(unittest.IsolatedAsyncioTestCase):
             "is_complete": False,
         }
 
-        with patch("db.repositories.base.get_database", return_value={"learning_content": fake_collection}):
+        with patch("db.repositories.base.get_database", return_value={"learning_contents": fake_collection}):
             repository = LearningContentRepository()
             updated = await repository.mark_complete("lesson-001")
             document = await repository.get_content("lesson-001")

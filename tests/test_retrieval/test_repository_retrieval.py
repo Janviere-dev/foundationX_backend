@@ -81,7 +81,7 @@ class RepositoryRetrievalTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        with patch("db.repositories.base.get_database", return_value={"learning_content": fake_collection}):
+        with patch("db.repositories.base.get_database", return_value={"learning_contents": fake_collection}):
             repository = LearningContentRepository()
             content = await repository.get_content("lesson-42")
 
