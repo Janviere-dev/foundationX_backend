@@ -70,11 +70,16 @@ class Assessment:
     async def generate_questions(self, quizz_request:QuizzQuestionRequest, student:dict) -> QuizzQuestionResponse:
         """
         This function generates quizz question. A student must finish
-        their current quiz before starting a new one - unless the current
-        one has expired out of Redis without being finished, in which case
-        it's marked abandoned and a new quiz is allowed.
+        their current quiz for this same lesson before starting another one
+        on it - unless the current one has expired out of Redis without
+        being finished, in which case it's marked abandoned and a new quiz
+        is allowed. Quizzes on other lessons are unaffected.
         """
-        pending_session = await self.quiz_repository.find_incomplete_session(student["user_id"])
+        pending_session = await self.quiz_repository.find_incomplete_session(
+            user_id=student["user_id"],
+            subject=quizz_request.subject,
+            learning_query=quizz_request.learning_query,
+            )
         if pending_session is not None:
             pending_quizz_id = pending_session["_id"]
             cached_json = await get_cached_quizz(pending_quizz_id)
