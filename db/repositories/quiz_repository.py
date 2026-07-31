@@ -32,12 +32,13 @@ class QuizSessionRepository(BaseRepository):
         """
         return await self.find_by_id(doc_id=quizz_id)
 
-    async def find_incomplete_session(self, user_id: str) -> Optional[dict]:
-        """Find this user's most recent quiz still in "started" status, if
-        any - used to block starting a new quiz before the current one is
-        finished or has expired into "abandoned"."""
+    async def find_incomplete_session(self, user_id: str, subject: str, learning_query: str) -> Optional[dict]:
+        """Find this user's most recent still-"started" quiz for this exact
+        lesson (subject+learning_query), if any - scoped per lesson so an
+        unfinished quiz on one topic doesn't block starting a quiz on
+        another."""
         return await self.collection.find_one(
-            {"user_id": user_id, "status": "started"},
+            {"user_id": user_id, "subject": subject, "learning_query": learning_query, "status": "started"},
             sort=[("created_at", -1)],
             )
 
