@@ -77,6 +77,7 @@ class QuizzAssessmentReport(BaseModel):
     current_understanding_level:str = Field(description="Narrative summary of the student's grasp of the topic")
     next_steps:List[str] = Field(description="What the student should focus on next")
     resources:List[ResourceReference] = Field(default_factory=list)
+    graded_at:Optional[str] = Field(description="When this report was graded", default=None)
 
 class QuizProgressSummary(BaseModel):
     started:int

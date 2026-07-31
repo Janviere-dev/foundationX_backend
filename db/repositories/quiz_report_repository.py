@@ -27,4 +27,4 @@ class QuizReportRepository(BaseRepository):
         return await self.find_by_id(doc_id=quizz_id)
 
     async def list_reports_for_user(self, user_id: str) -> list[dict]:
-        return await self.find_many(filter_query={"user_id": user_id}, limit=100)
+        return await self.find_many(filter_query={"user_id": user_id}, limit=100, sort=[("graded_at", -1)])
