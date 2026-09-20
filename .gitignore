@@ -14,4 +14,5 @@ planning.pdf
 foundationx_service_account.json
 test_firebase.sh
 start.sh
-designs/
+copy_file.sh
+documentation/
